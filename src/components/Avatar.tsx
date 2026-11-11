@@ -1,7 +1,15 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 /**
- * Shows the Google profile photo, or falls back to initials when the user has
- * no photo. Plain <img> (not next/image) keeps us from having to allow-list
- * Google's image CDN and proxy the image through our server.
+ * Shows the Google profile photo, or initials when there's no photo or the
+ * photo fails to load (expired URL, blocked by an extension, offline).
+ *
+ * Plain <img> (not next/image) avoids allow-listing and proxying Google's
+ * image CDN through our server.
+ *
+ * Decorative (alt=""): the user's name is printed right next to it.
  */
 export function Avatar({
   name,
@@ -12,13 +20,25 @@ export function Avatar({
   email: string | null;
   image: string | null;
 }) {
-  if (image) {
+  const [failed, setFailed] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+
+  // The image is server-rendered, so it can fail before React hydrates and
+  // attaches onError. Catch that case by checking the element on mount.
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setFailed(true);
+  }, []);
+
+  if (image && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={img}
         src={image}
         alt=""
         referrerPolicy="no-referrer" // Google avatars can 403 when a referrer is sent
+        onError={() => setFailed(true)}
         className="h-16 w-16 rounded-full object-cover"
       />
     );
@@ -27,7 +47,7 @@ export function Avatar({
   return (
     <div
       aria-hidden
-      className="flex h-16 w-16 items-center justify-center rounded-full bg-brand/10 text-xl font-semibold text-brand"
+      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xl font-semibold text-brand"
     >
       {initials(name ?? email ?? "?")}
     </div>

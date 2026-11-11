@@ -40,8 +40,11 @@ model Fact {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Matches the hot query: "latest fact for this user + movie".
+  // "Latest facts for this user + movie": sent to the model so it doesn't
+  // repeat itself (lib/facts.ts).
   @@index([userId, movie, createdAt(sort: Desc)])
+  // "Facts this user created in the last minute": the per-user rate limit.
+  @@index([userId, createdAt])
 }
 
 // ---------------------------------------------------------------------------

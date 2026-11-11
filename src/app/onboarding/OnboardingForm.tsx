@@ -15,7 +15,8 @@ export function OnboardingForm() {
   return (
     <form action={formAction} className="space-y-3">
       <label htmlFor="movie" className="block text-sm font-semibold text-ink">
-Type in a movie   </label>
+        Favorite movie
+      </label>
       {/* maxLength/required are UX hints only — the server action is the
           real validation boundary. */}
       <input

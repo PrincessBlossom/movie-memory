@@ -13,7 +13,10 @@ export default async function OnboardingPage() {
         <h1 className="text-2xl font-bold text-brand">
           Welcome{user.name ? `, ${user.name.split(" ")[0]}` : ""}!
         </h1>
-        <p className="text-ink/70">Type in a movie. If you know of multiple movies with the same title, add the year (e. g. Dune (1984) vs Dune (2021)).  </p>
+        <p className="text-ink/70">
+          What&apos;s your favorite movie? If several movies share the title,
+          add the year, e.g. Dune (1984).
+        </p>
       </div>
       <OnboardingForm />
     </div>

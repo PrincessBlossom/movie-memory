@@ -15,9 +15,14 @@ export function jsonOk<T>(body: T, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE });
 }
 
-export function jsonError(status: number, code: ApiErrorCode, message: string) {
+export function jsonError(
+  status: number,
+  code: ApiErrorCode,
+  message: string,
+  headers: Record<string, string> = {},
+) {
   const body: ApiErrorBody = { error: { code, message } };
-  return NextResponse.json(body, { status, headers: NO_STORE });
+  return NextResponse.json(body, { status, headers: { ...NO_STORE, ...headers } });
 }
 
 export const unauthorized = () =>

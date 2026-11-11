@@ -26,7 +26,7 @@ export const API_ERROR_CODES = [
   "UNAUTHORIZED", // 401: no valid session
   "VALIDATION_ERROR", // 400: bad request body
   "NO_FAVORITE_MOVIE", // 409: fact requested before onboarding
-  "RATE_LIMITED", // 429: OpenAI rate limit hit
+  "RATE_LIMITED", // 429: per-user fact limit, or OpenAI's own rate limit
   "FACT_GENERATION_FAILED", // 502: OpenAI failed or timed out
   "INTERNAL_ERROR", // 500: anything unexpected
   // Client-only codes, produced in the browser, never sent by the server:
