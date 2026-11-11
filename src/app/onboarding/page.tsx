@@ -10,10 +10,10 @@ export default async function OnboardingPage() {
   return (
     <div className="space-y-6 rounded-2xl bg-white p-8 shadow-sm">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-2xl font-bold text-brand">
           Welcome{user.name ? `, ${user.name.split(" ")[0]}` : ""}!
         </h1>
-        <p className="text-slate-600">One quick question before we start.</p>
+        <p className="text-ink/70">One quick question before we start.</p>
       </div>
       <OnboardingForm />
     </div>

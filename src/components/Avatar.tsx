@@ -27,7 +27,7 @@ export function Avatar({
   return (
     <div
       aria-hidden
-      className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-xl font-semibold text-indigo-700"
+      className="flex h-16 w-16 items-center justify-center rounded-full bg-brand/10 text-xl font-semibold text-brand"
     >
       {initials(name ?? email ?? "?")}
     </div>

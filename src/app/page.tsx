@@ -24,8 +24,10 @@ export default async function LandingPage({
   return (
     <div className="space-y-8 text-center">
       <div className="space-y-3">
-        <h1 className="text-4xl font-bold tracking-tight">🎬 Movie Memory</h1>
-        <p className="text-slate-600">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Your favorite movie, remembered.
+        </h1>
+        <p className="text-ink/70">
           Tell us your favorite movie and we&apos;ll dig up fun facts about it.
         </p>
       </div>
@@ -45,7 +47,7 @@ export default async function LandingPage({
       >
         <button
           type="submit"
-          className="rounded-lg bg-slate-900 px-6 py-3 font-medium text-white shadow hover:bg-slate-700"
+          className="rounded-lg bg-brand px-6 py-3 font-semibold text-white shadow transition-colors duration-[750ms] hover:bg-ink"
         >
           Sign in with Google
         </button>

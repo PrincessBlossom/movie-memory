@@ -1,17 +1,20 @@
-import { signOut } from "@/auth";
+"use client";
+
+import { signOutAction } from "@/app/actions";
+import { factCache } from "@/lib/fact-cache";
 
 export function SignOutButton() {
   return (
     <form
       action={async () => {
-        "use server";
-        await signOut({ redirectTo: "/" });
+        // Cache entries are already keyed by user id, so another account could
+        // never read them. Clearing on sign-out also removes this user's data
+        // from the tab.
+        factCache.clear();
+        await signOutAction();
       }}
     >
-      <button
-        type="submit"
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-      >
+      <button type="submit" className="link-underline cursor-pointer text-sm font-semibold">
         Log out
       </button>
     </form>

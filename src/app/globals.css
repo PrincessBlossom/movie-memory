@@ -1,9 +1,51 @@
 @import "tailwindcss";
 
+/* Design tokens → Tailwind utilities: bg-brand, text-ink, font-sans, ... */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-montserrat), sans-serif;
+  --color-brand: #002b75;
+  --color-ink: #232323;
+  --color-mist: #ece9e6;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 font-sans;
+  position: relative; /* anchors the absolutely positioned site header */
+  min-height: 100vh; /* min, not fixed, so long pages can still scroll */
+  background: var(--color-mist); /* fallback */
+  background: linear-gradient(to right, #ffffff, var(--color-mist));
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+}
+
+/*
+ * Text button with a navy underline that grows in on hover, the same idea as
+ * the menu-item underline (".wee") in the original design.
+ */
+@utility link-underline {
+  position: relative;
+  color: var(--color-ink);
+  transition: color 0.75s;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    height: 2px;
+    width: 100%;
+    background-color: var(--color-brand);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.75s;
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--color-brand);
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    transform: scaleX(1);
+  }
 }

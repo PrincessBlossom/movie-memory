@@ -1,9 +1,8 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { Avatar } from "@/components/Avatar";
 import { SignOutButton } from "@/components/SignOutButton";
-import { FactCard, FactCardSkeleton } from "./FactCard";
+import { MovieDashboard } from "./MovieDashboard";
 
 export default async function DashboardPage() {
   const user = await requireUser(); // no session → "/"
@@ -20,28 +19,17 @@ export default async function DashboardPage() {
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{displayName}</p>
             {user.email && (
-              <p className="truncate text-sm text-slate-500">{user.email}</p>
+              <p className="truncate text-sm text-ink/60">{user.email}</p>
             )}
           </div>
         </div>
         <SignOutButton />
       </header>
 
-      <section className="space-y-2 rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Favorite movie
-        </h2>
-        <p className="text-2xl font-bold">{user.favoriteMovie}</p>
-      </section>
-
-      <section className="space-y-3 rounded-2xl bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-          Fun fact
-        </h2>
-        <Suspense fallback={<FactCardSkeleton />}>
-          <FactCard userId={user.id} movie={user.favoriteMovie} />
-        </Suspense>
-      </section>
+      {/* Profile above is server-rendered. The interactive part (movie
+          editing + facts) is a client component seeded with server data, so
+          the first paint needs no client-side fetch for the movie. */}
+      <MovieDashboard userId={user.id} initialMovie={user.favoriteMovie} />
     </div>
   );
 }

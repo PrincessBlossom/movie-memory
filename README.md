@@ -8,8 +8,10 @@ Sign in with Google, tell us your favorite movie, and get a fun fact about it ge
 
 1. **Sign in.** Visit `/` and click **Sign in with Google**.
 2. **Onboarding (first time only).** New users are asked for their favorite movie. The title is trimmed and validated on the server (1–200 characters) and saved to your account.
-3. **Dashboard.** Shows your name, email and Google photo (or your initials if there's no photo), your favorite movie, and a fun fact about it. The page appears straight away and the fact loads in a few seconds. A new fact is generated, and saved, each time you load the page.
-4. **Log out.** The button is in the top-right of the dashboard.
+3. **Dashboard.** Shows your name, email and Google photo (or your initials if there's no photo), your favorite movie, and a fun fact about it.
+   - **Edit your movie inline.** Click **Edit**, change the title, then **Save** (or Enter) or **Cancel** (or Escape). The new title appears immediately. If the save fails, it reverts and the editor reopens with your text and the error.
+   - **Facts are cached for 30 seconds.** Refreshing the page within 30s shows the same fact (marked "from cache"). Click **New fact** to always get a fresh one. Changing your movie discards the cached fact.
+4. **Log out.** The button is in the top-right of the dashboard. Logging out also clears the cached fact.
 
 Returning users skip onboarding and go straight to the dashboard. Signed-out users who visit `/dashboard` or `/onboarding` are sent back to `/`.
 
@@ -83,6 +85,7 @@ Open http://localhost:3000.
 | `npm run build` / `npm start` | Production build and start |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript checks with no output files |
+| `npm test` | Run the test suite (Vitest) |
 | `npm run db:up` | Start local Postgres (Docker) |
 | `npm run db:migrate` | Create and apply migrations (`prisma migrate dev`) |
 
@@ -97,8 +100,24 @@ src/lib/openai.ts           Server-only OpenAI call
 src/lib/facts.ts            Generates and stores facts
 src/app/page.tsx            Landing page
 src/app/onboarding/         Favorite-movie form + server action
-src/app/dashboard/          Dashboard + fun fact card
+src/app/dashboard/          Dashboard: server page + client MovieDashboard, editor, fact card
+src/app/api/                Route handlers: /api/me, /api/me/movie, /api/fact
+src/lib/api-contract.ts     Shared request/response schemas + error codes (server & client)
+src/lib/api-server.ts       Server helpers: consistent JSON/error responses, session user id
+src/lib/api.ts              Typed client: validates responses, normalizes errors to ApiError
+src/lib/fact-cache.ts       30s client-side fact cache (sessionStorage)
+src/hooks/useFact.ts        Fact loading: cache, dedupe, stale-response protection
 ```
+
+## API
+
+All endpoints act on the signed-in user (identified only by the session cookie) and return `Cache-Control: private, no-store`. Errors always have the shape `{ "error": { "code": "...", "message": "..." } }`.
+
+| Endpoint | Success | Errors |
+| --- | --- | --- |
+| `GET /api/me` | `200 { user: { name, email, image, favoriteMovie } }` | `401 UNAUTHORIZED` |
+| `PUT /api/me/movie` with body `{ movie }` | `200 { favoriteMovie }` (the trimmed, stored title) | `400 VALIDATION_ERROR`, `401` |
+| `GET /api/fact` | `200 { fact: { id, movie, content, createdAt } }` (generates and stores a new fact) | `401`, `409 NO_FAVORITE_MOVIE`, `429 RATE_LIMITED`, `502 FACT_GENERATION_FAILED` |
 
 ## Troubleshooting
 
