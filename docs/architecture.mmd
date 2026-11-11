@@ -1,0 +1,42 @@
+flowchart TB
+  subgraph Browser
+    direction LR
+    Pages["Server-rendered pages<br/>/ · /onboarding · /dashboard"]
+    subgraph Client["Client components"]
+      direction LR
+      Dashboard[MovieDashboard] --> UseFact[useFact] --> ApiClient[lib/api.ts]
+      UseFact <--> Cache[("lib/fact-cache.ts<br/>sessionStorage, 30s TTL")]
+    end
+  end
+
+  subgraph Next["Next.js App Router (server)"]
+    direction LR
+    subgraph Server["Pages + server actions"]
+      RequireUser["requireUser()"]
+    end
+    subgraph Routes["Route handlers"]
+      Me["GET /api/me"]
+      Movie["PUT /api/me/movie"]
+      FactRoute["GET /api/fact"]
+      SessionId["getSessionUserId()"]
+    end
+    Facts["lib/facts.ts<br/>coalescing + 5/min limit"]
+    OpenAILib["lib/openai.ts (server-only)"]
+  end
+
+  AuthJs["Auth.js<br/>database sessions"]
+  Prisma[Prisma]
+  DB[("Postgres (Neon)")]
+  OpenAI(["OpenAI Responses API"])
+
+  Pages --> RequireUser
+  ApiClient -- "fetch + session cookie" --> Routes
+  Me & Movie & FactRoute --> SessionId
+  RequireUser --> AuthJs
+  SessionId --> AuthJs
+  AuthJs --> Prisma
+  Me & Movie --> Prisma
+  FactRoute --> Facts
+  Facts --> Prisma
+  Facts --> OpenAILib --> OpenAI
+  Prisma --> DB

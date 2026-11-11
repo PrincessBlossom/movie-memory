@@ -16,5 +16,6 @@ export default defineConfig({
     environment: "jsdom", // route handler tests opt into "node" per file
     setupFiles: ["./test/setup.ts"],
     restoreMocks: true,
+    exclude: ["**/node_modules/**", "e2e/**"], // Playwright specs, run by `npm run test:e2e`
   },
 });
