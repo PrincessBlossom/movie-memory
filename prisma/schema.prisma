@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL") // pooled: used by the app at runtime
+  directUrl = env("DATABASE_URL_UNPOOLED") // direct: used by prisma migrate
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  /// The user's favorite movie title. `null` means the user has not completed
+  /// onboarding — this doubles as the "first-time user" signal, so there is no
+  /// separate `onboarded` flag that could drift out of sync.
+  favoriteMovie String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  facts    Fact[]
+}
+
+/// A generated fun fact. `movie` is a snapshot of the title at generation time,
+/// so a fact about an old favorite is never mistaken for one about the current
+/// favorite after the user changes it.
+model Fact {
+  id        String   @id @default(cuid())
+  userId    String
+  movie     String
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Matches the hot query: "latest fact for this user + movie".
+  @@index([userId, movie, createdAt(sort: Desc)])
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js Prisma adapter models (https://authjs.dev/getting-started/adapters/prisma)
+// ---------------------------------------------------------------------------
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
