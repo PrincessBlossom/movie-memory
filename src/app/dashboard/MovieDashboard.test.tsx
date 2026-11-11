@@ -45,7 +45,7 @@ function renderDashboard() {
 }
 
 async function editTitleTo(user: ReturnType<typeof userEvent.setup>, title: string) {
-  await user.click(screen.getByRole("button", { name: "Edit" }));
+  await user.click(screen.getByRole("button", { name: "Edit favorite movie" }));
   const input = screen.getByLabelText("Favorite movie");
   await user.clear(input);
   if (title) await user.type(input, title);
@@ -169,6 +169,56 @@ describe("movie edit flow", () => {
     await user.click(await screen.findByRole("button", { name: "Cancel" }));
     expect(await screen.findByText("Fun fact about Heat.")).toBeInTheDocument();
     expect(screen.getByText("Heat")).toBeInTheDocument();
+  });
+});
+
+describe("keyboard accessibility", () => {
+  it("returns focus to the Edit button after Cancel, Escape and Save", async () => {
+    const { user } = renderDashboard();
+    await screen.findByText("Fun fact about Up.");
+    const editButton = () => screen.getByRole("button", { name: "Edit favorite movie" });
+
+    await user.click(editButton());
+    expect(screen.getByLabelText("Favorite movie")).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(editButton()).toHaveFocus();
+
+    await user.click(editButton());
+    await user.keyboard("{Escape}");
+    expect(editButton()).toHaveFocus();
+
+    // During a save the Edit button keeps focus but is marked unavailable.
+    const save = deferred<string>();
+    mockApi.updateMovie.mockReturnValue(save.promise);
+    await editTitleTo(user, "Heat");
+    await user.keyboard("{Enter}");
+    expect(editButton()).toHaveFocus();
+    expect(editButton()).toHaveAttribute("aria-disabled", "true");
+    await user.click(editButton()); // ignored while saving
+    expect(screen.queryByLabelText("Favorite movie")).not.toBeInTheDocument();
+
+    mockApi.getFact.mockImplementation(async () => fact("Heat"));
+    save.resolve("Heat");
+    await waitFor(() => expect(editButton()).toHaveAttribute("aria-disabled", "false"));
+  });
+
+  it("keeps 'New fact' focusable while loading, without sending duplicate requests", async () => {
+    const { user } = renderDashboard();
+    await screen.findByText("Fun fact about Up.");
+
+    const pending = deferred<Fact>();
+    mockApi.getFact.mockReturnValue(pending.promise);
+    const button = screen.getByRole("button", { name: "New fact" });
+    await user.click(button);
+
+    const busyButton = screen.getByRole("button", { name: "Generating…" });
+    expect(busyButton).toHaveFocus();
+    expect(busyButton).toHaveAttribute("aria-disabled", "true");
+    await user.click(busyButton);
+    expect(mockApi.getFact).toHaveBeenCalledTimes(2); // initial load + one refresh
+
+    pending.resolve({ ...fact("Up"), id: "f2", content: "Another Up fact." });
+    expect(await screen.findByText("Another Up fact.")).toBeInTheDocument();
   });
 });
 

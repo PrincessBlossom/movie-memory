@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ApiError } from "@/lib/api";
 import { MOVIE_MAX_LENGTH } from "@/lib/constants";
 import { movieTitleSchema } from "@/lib/validation";
@@ -11,7 +11,7 @@ const labelClass = "text-xs font-semibold tracking-widest text-brand uppercase";
 const primaryButton =
   "cursor-pointer rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors duration-[750ms] hover:bg-ink";
 const secondaryButton =
-  "cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-ink transition-colors duration-[750ms] hover:bg-mist";
+  "cursor-pointer rounded-lg border border-ink/20 px-4 py-2 text-sm font-semibold text-ink transition-colors duration-[750ms] hover:bg-mist";
 
 /**
  * Shows the favorite movie with an inline editor (Save + Cancel).
@@ -21,6 +21,9 @@ const secondaryButton =
  * - Input is validated with the same zod schema the server uses, so obvious
  *   errors are caught without a request. The server still re-validates.
  * - An unchanged title closes the editor without a request.
+ * - Focus is managed for keyboard and screen reader users: opening the editor
+ *   focuses the input, and closing it (Save, Cancel or Escape) returns focus to
+ *   the Edit button, instead of losing it when the form unmounts.
  * - On save the editor closes right away and the parent shows the new title
  *   optimistically. If the save fails, the parent reverts the title, and the
  *   editor reopens with the user's text and the error, so nothing typed is lost.
@@ -38,6 +41,20 @@ export function FavoriteMovieEditor({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const editButton = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (!isEditing && restoreFocus.current) {
+      restoreFocus.current = false;
+      editButton.current?.focus();
+    }
+  }, [isEditing]);
+
+  function closeEditor() {
+    restoreFocus.current = true;
+    setIsEditing(false);
+  }
+
   function startEditing() {
     setDraft(movie);
     setError(null);
@@ -45,7 +62,7 @@ export function FavoriteMovieEditor({
   }
 
   function cancel() {
-    setIsEditing(false);
+    closeEditor();
     setError(null);
   }
 
@@ -61,7 +78,7 @@ export function FavoriteMovieEditor({
       return;
     }
 
-    setIsEditing(false);
+    closeEditor();
     setError(null);
     const result = await onSave(title);
     if (!result.ok && result.error.code !== "UNAUTHORIZED") {
@@ -118,17 +135,25 @@ export function FavoriteMovieEditor({
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-4">
         <h2 className={labelClass}>Favorite movie</h2>
+        {/* aria-disabled (not `disabled`) so focus can rest here during a
+            save without being dropped. aria-label gives screen reader users
+            the full name; it starts with the visible word "Edit" so speech
+            control ("click Edit") still works (WCAG 2.5.3, label in name). */}
         <button
+          ref={editButton}
           type="button"
-          onClick={startEditing}
-          disabled={isSaving}
-          className="link-underline cursor-pointer text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => {
+            if (!isSaving) startEditing();
+          }}
+          aria-disabled={isSaving}
+          aria-label="Edit favorite movie"
+          className="link-underline cursor-pointer text-sm font-semibold"
         >
           Edit
         </button>
       </div>
       <p className="text-2xl font-bold break-words text-ink">{movie}</p>
-      <p aria-live="polite" className="h-5 text-sm text-ink/60">
+      <p aria-live="polite" className="h-5 text-sm text-ink/70">
         {isSaving ? "Saving…" : ""}
       </p>
     </div>

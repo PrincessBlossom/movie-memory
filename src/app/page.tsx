@@ -47,7 +47,7 @@ export default async function LandingPage({
       >
         <button
           type="submit"
-          className="rounded-lg bg-brand px-6 py-3 font-semibold text-white shadow transition-colors duration-[750ms] hover:bg-ink"
+          className="cursor-pointer rounded-lg bg-brand px-6 py-3 font-semibold text-white shadow transition-colors duration-[750ms] hover:bg-ink"
         >
           Sign in with Google
         </button>

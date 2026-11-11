@@ -26,11 +26,17 @@ export function FactCard({
         <h2 className="text-xs font-semibold tracking-widest text-brand uppercase">
           Fun fact
         </h2>
+        {/* aria-disabled instead of `disabled`: a disabled button drops
+            keyboard focus to <body> the moment it's clicked. aria-disabled
+            keeps it focusable and announced as unavailable; the click guard
+            enforces it. */}
         <button
           type="button"
-          onClick={refresh}
-          disabled={busy}
-          className="link-underline cursor-pointer text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => {
+            if (!busy) refresh();
+          }}
+          aria-disabled={busy}
+          className="link-underline cursor-pointer text-sm font-semibold"
         >
           {isLoading ? "Generating…" : "New fact"}
         </button>
@@ -38,11 +44,11 @@ export function FactCard({
 
       <div aria-live="polite" aria-busy={busy}>
         {isWaitingForMovie ? (
-          <p className="text-ink/60">Saving your new movie. A fresh fact is on the way…</p>
+          <p className="text-ink/70">Saving your new movie. A fresh fact is on the way…</p>
         ) : fact ? (
           <div className={isLoading ? "opacity-50 transition-opacity" : undefined}>
             <p className="leading-relaxed text-ink">{fact.content}</p>
-            <p className="mt-2 text-xs text-ink/50">
+            <p className="mt-2 text-xs text-ink/70">
               Generated {formatTime(fact.createdAt)}
               {fromCache && " · from cache"}
             </p>
@@ -50,7 +56,7 @@ export function FactCard({
         ) : isLoading ? (
           <FactSkeleton />
         ) : error ? null : (
-          <p className="text-ink/60">No fact yet. Click “New fact” to get one.</p>
+          <p className="text-ink/70">No fact yet. Click “New fact” to get one.</p>
         )}
       </div>
 
@@ -63,7 +69,7 @@ export function FactCard({
           <button
             type="button"
             onClick={refresh}
-            className="cursor-pointer font-semibold whitespace-nowrap underline"
+            className="cursor-pointer rounded px-2 py-1 font-semibold whitespace-nowrap underline"
           >
             Try again
           </button>
@@ -75,9 +81,11 @@ export function FactCard({
 
 function FactSkeleton() {
   return (
-    <div className="animate-pulse space-y-2" aria-label="Loading fun fact">
-      <div className="h-4 w-full rounded bg-ink/10" />
-      <div className="h-4 w-2/3 rounded bg-ink/10" />
+    <div className="animate-pulse space-y-2">
+      {/* aria-label is ignored on a plain div; real text is announced. */}
+      <span className="sr-only">Loading fun fact…</span>
+      <div aria-hidden="true" className="h-4 w-full rounded bg-ink/10" />
+      <div aria-hidden="true" className="h-4 w-2/3 rounded bg-ink/10" />
     </div>
   );
 }

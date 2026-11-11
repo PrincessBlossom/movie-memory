@@ -19,7 +19,7 @@ export default async function DashboardPage() {
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{displayName}</p>
             {user.email && (
-              <p className="truncate text-sm text-ink/60">{user.email}</p>
+              <p className="truncate text-sm text-ink/70">{user.email}</p>
             )}
           </div>
         </div>
