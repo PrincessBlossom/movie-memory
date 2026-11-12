@@ -81,9 +81,20 @@ async function generateAndStore(userId: string, movie: string): Promise<Fact> {
     throw new FactRateLimitError(Math.max(1, Math.ceil(retryAfterMs / 1000)));
   }
 
-  const content = await generateMovieFact(
+  const { content, recognized } = await generateMovieFact(
     movie,
     previous.map((f) => f.content),
   );
-  return prisma.fact.create({ data: { userId, movie, content } });
+  return prisma.fact.create({ data: { userId, movie, content, recognized } });
+}
+
+/**
+ * The most recent stored fact about `movie` for this user, or null. A plain
+ * read: no OpenAI call, no write, no rate limit.
+ */
+export function getLatestFact(userId: string, movie: string): Promise<Fact | null> {
+  return prisma.fact.findFirst({
+    where: { userId, movie },
+    orderBy: { createdAt: "desc" }, // @@index([userId, movie, createdAt(sort: Desc)])
+  });
 }

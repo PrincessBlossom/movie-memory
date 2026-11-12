@@ -33,7 +33,7 @@ function fetchFactDeduped(userId: string, movie: string): Promise<Fact> {
   const key = `${userId}\u0000${movie}`;
   let promise = inflight.get(key);
   if (!promise) {
-    promise = api.getFact().finally(() => inflight.delete(key));
+    promise = api.generateFact().finally(() => inflight.delete(key));
     inflight.set(key, promise);
   }
   return promise;
@@ -44,7 +44,7 @@ function fetchFactDeduped(userId: string, movie: string): Promise<Fact> {
  *
  * - `movie === null` pauses the hook: nothing is shown or fetched. The
  *   dashboard passes null while a movie edit is being saved, because
- *   GET /api/fact uses the movie *stored on the server*, so fetching
+ *   POST /api/fact uses the movie *stored on the server*, so fetching
  *   mid-save could return a fact about the old title.
  * - `refresh()` is the explicit "new fact" action and bypasses the cache.
  * - Responses that arrive after the movie changed (or after a newer request

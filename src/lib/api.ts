@@ -12,6 +12,7 @@ import type { z } from "zod";
 import {
   apiErrorBodySchema,
   factResponseSchema,
+  latestFactResponseSchema,
   meResponseSchema,
   updateMovieResponseSchema,
   type ApiErrorCode,
@@ -130,9 +131,15 @@ export const api = {
     return favoriteMovie;
   },
 
-  /** GET /api/fact: generates a new fact on the server. */
-  async getFact(): Promise<Fact> {
-    const { fact } = await request("/api/fact", factResponseSchema);
+  /** POST /api/fact: generates and stores a new fact (a paid OpenAI call). */
+  async generateFact(): Promise<Fact> {
+    const { fact } = await request("/api/fact", factResponseSchema, { method: "POST" });
+    return fact;
+  },
+
+  /** GET /api/fact: the latest stored fact about the current movie, or null. No generation. */
+  async getLatestFact(): Promise<Fact | null> {
+    const { fact } = await request("/api/fact", latestFactResponseSchema);
     return fact;
   },
 };

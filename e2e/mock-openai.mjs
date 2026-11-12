@@ -24,7 +24,8 @@ http
     req.on("end", () => {
       const { input = "", model } = JSON.parse(body || "{}");
       const title = /<movie_title>(.*?)<\/movie_title>/s.exec(input)?.[1] ?? "?";
-      const text = `E2E fact about ${title}.`;
+      // Same JSON shape the real model returns under Structured Outputs.
+      const text = JSON.stringify({ recognized: true, fact: `E2E fact about ${title}.` });
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({

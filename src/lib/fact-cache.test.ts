@@ -16,6 +16,7 @@ const fact = (movie: string): Fact => ({
   id: "f1",
   movie,
   content: `A fact about ${movie}`,
+  recognized: true,
   createdAt: "2026-01-01T00:00:00.000Z",
 });
 

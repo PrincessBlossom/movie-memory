@@ -47,6 +47,15 @@ export function FactCard({
           <p className="text-ink/70">Saving your new movie. A fresh fact is on the way…</p>
         ) : fact ? (
           <div className={isLoading ? "opacity-50 transition-opacity" : undefined}>
+            {!fact.recognized && (
+              // The model couldn't identify the title, so the fact is about a
+              // similar film. Say so rather than pass it off as this movie.
+              <p className="mb-2 text-sm font-semibold text-ink/70">
+                We couldn&apos;t find a movie called “{fact.movie}”. Here&apos;s a fact
+                about a similar film instead. Adding the year, or checking the
+                spelling, can help.
+              </p>
+            )}
             <p className="leading-relaxed text-ink">{fact.content}</p>
             <p className="mt-2 text-xs text-ink/70">
               Generated {formatTime(fact.createdAt)}

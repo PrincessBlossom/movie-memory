@@ -1,26 +1,33 @@
-import type { FactResponse } from "@/lib/api-contract";
+import type { Fact as FactRow } from "@prisma/client";
+import type { Fact, FactResponse, LatestFactResponse } from "@/lib/api-contract";
 import {
   getSessionUserId,
   jsonError,
   jsonOk,
   unauthorized,
 } from "@/lib/api-server";
-import { createFactForUser, FactRateLimitError } from "@/lib/facts";
+import { createFactForUser, FactRateLimitError, getLatestFact } from "@/lib/facts";
 import { FactGenerationError } from "@/lib/openai";
 import { prisma } from "@/lib/prisma";
 
 /**
- * GET /api/fact: generate, store and return a new fun fact about the
- * signed-in user's current favorite movie.
+ * /api/fact
  *
- * Every call generates a new fact. Caching is the client's job in Variant B
- * (see lib/fact-cache.ts). This makes the GET non-idempotent, which is a
- * deliberate tradeoff to match the spec'd endpoint (see README).
+ * GET   the latest stored fact about the user's current favorite movie, or
+ *       null. Safe and idempotent: no OpenAI call, no write.
+ * POST  generate, store and return a new fact. Each call is a paid OpenAI
+ *       call and a new row, so it's a POST: browsers, crawlers and prefetchers
+ *       never repeat it on their own, and the session cookie (SameSite=Lax)
+ *       isn't sent on cross-site POSTs, so another site can't trigger it.
  *
- * Cost is bounded server-side (lib/facts.ts): concurrent requests share one
- * generation, and each user gets at most 5 facts per minute.
+ * Cost is also bounded server-side (lib/facts.ts): concurrent requests share
+ * one generation, and each user gets at most 5 facts per minute.
  */
-export async function GET() {
+
+type Movie = { userId: string; movie: string };
+
+/** The session user and their favorite movie, or the error response to return. */
+async function resolveMovie(): Promise<Movie | Response> {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
 
@@ -36,17 +43,34 @@ export async function GET() {
       "Set a favorite movie before requesting a fact.",
     );
   }
+  return { userId, movie: user.favoriteMovie };
+}
+
+function toDto(fact: FactRow): Fact {
+  return {
+    id: fact.id,
+    movie: fact.movie,
+    content: fact.content,
+    recognized: fact.recognized,
+    createdAt: fact.createdAt.toISOString(),
+  };
+}
+
+export async function GET() {
+  const resolved = await resolveMovie();
+  if (resolved instanceof Response) return resolved;
+
+  const fact = await getLatestFact(resolved.userId, resolved.movie);
+  return jsonOk<LatestFactResponse>({ fact: fact && toDto(fact) });
+}
+
+export async function POST() {
+  const resolved = await resolveMovie();
+  if (resolved instanceof Response) return resolved;
 
   try {
-    const fact = await createFactForUser(userId, user.favoriteMovie);
-    return jsonOk<FactResponse>({
-      fact: {
-        id: fact.id,
-        movie: fact.movie,
-        content: fact.content,
-        createdAt: fact.createdAt.toISOString(),
-      },
-    });
+    const fact = await createFactForUser(resolved.userId, resolved.movie);
+    return jsonOk<FactResponse>({ fact: toDto(fact) });
   } catch (err) {
     if (err instanceof FactRateLimitError) {
       return jsonError(

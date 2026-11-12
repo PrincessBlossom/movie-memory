@@ -14,7 +14,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual, // keep the real ApiError class
-    api: { getMe: vi.fn(), updateMovie: vi.fn(), getFact: vi.fn() },
+    api: { getMe: vi.fn(), updateMovie: vi.fn(), generateFact: vi.fn(), getLatestFact: vi.fn() },
   };
 });
 
@@ -24,6 +24,7 @@ const fact = (movie: string): Fact => ({
   id: `fact-${movie}`,
   movie,
   content: `Fun fact about ${movie}.`,
+  recognized: true,
   createdAt: "2026-11-10T12:00:00.000Z",
 });
 
@@ -54,7 +55,7 @@ async function editTitleTo(user: ReturnType<typeof userEvent.setup>, title: stri
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mockApi.getFact.mockImplementation(async () => fact("Up"));
+  mockApi.generateFact.mockImplementation(async () => fact("Up"));
 });
 
 describe("movie edit flow", () => {
@@ -72,14 +73,14 @@ describe("movie edit flow", () => {
     expect(screen.getByText("Saving…")).toBeInTheDocument();
     expect(screen.queryByText("Fun fact about Up.")).not.toBeInTheDocument();
     expect(mockApi.updateMovie).toHaveBeenCalledWith("Heat");
-    expect(mockApi.getFact).toHaveBeenCalledTimes(1);
+    expect(mockApi.generateFact).toHaveBeenCalledTimes(1);
 
-    mockApi.getFact.mockImplementation(async () => fact("Heat"));
+    mockApi.generateFact.mockImplementation(async () => fact("Heat"));
     save.resolve("Heat");
 
     expect(await screen.findByText("Fun fact about Heat.")).toBeInTheDocument();
     expect(screen.getByText("Heat")).toBeInTheDocument();
-    expect(mockApi.getFact).toHaveBeenCalledTimes(2);
+    expect(mockApi.generateFact).toHaveBeenCalledTimes(2);
   });
 
   it("reverts the title and reopens the editor with the error if the save fails", async () => {
@@ -104,7 +105,7 @@ describe("movie edit flow", () => {
     expect(screen.getByText("Up")).toBeInTheDocument();
     expect(screen.queryByText("Heat")).not.toBeInTheDocument();
     expect(await screen.findByText("Fun fact about Up.")).toBeInTheDocument();
-    expect(mockApi.getFact).toHaveBeenCalledTimes(1);
+    expect(mockApi.generateFact).toHaveBeenCalledTimes(1);
   });
 
   it("Cancel and Escape discard edits without a request", async () => {
@@ -162,7 +163,7 @@ describe("movie edit flow", () => {
 
     mockApi.updateMovie.mockRejectedValue(new ApiError(0, "NETWORK_ERROR", "Couldn't reach the server."));
     mockApi.getMe.mockResolvedValue({ name: null, email: null, image: null, favoriteMovie: "Heat" });
-    mockApi.getFact.mockImplementation(async () => fact("Heat"));
+    mockApi.generateFact.mockImplementation(async () => fact("Heat"));
     await editTitleTo(user, "Heat");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
@@ -197,7 +198,7 @@ describe("keyboard accessibility", () => {
     await user.click(editButton()); // ignored while saving
     expect(screen.queryByLabelText("Favorite movie")).not.toBeInTheDocument();
 
-    mockApi.getFact.mockImplementation(async () => fact("Heat"));
+    mockApi.generateFact.mockImplementation(async () => fact("Heat"));
     save.resolve("Heat");
     await waitFor(() => expect(editButton()).toHaveAttribute("aria-disabled", "false"));
   });
@@ -207,7 +208,7 @@ describe("keyboard accessibility", () => {
     await screen.findByText("Fun fact about Up.");
 
     const pending = deferred<Fact>();
-    mockApi.getFact.mockReturnValue(pending.promise);
+    mockApi.generateFact.mockReturnValue(pending.promise);
     const button = screen.getByRole("button", { name: "New fact" });
     await user.click(button);
 
@@ -215,7 +216,7 @@ describe("keyboard accessibility", () => {
     expect(busyButton).toHaveFocus();
     expect(busyButton).toHaveAttribute("aria-disabled", "true");
     await user.click(busyButton);
-    expect(mockApi.getFact).toHaveBeenCalledTimes(2); // initial load + one refresh
+    expect(mockApi.generateFact).toHaveBeenCalledTimes(2); // initial load + one refresh
 
     pending.resolve({ ...fact("Up"), id: "f2", content: "Another Up fact." });
     expect(await screen.findByText("Another Up fact.")).toBeInTheDocument();
@@ -232,17 +233,17 @@ describe("fact caching", () => {
     const { user } = renderDashboard();
     expect(await screen.findByText("Fun fact about Up.")).toBeInTheDocument();
     expect(screen.getByText(/from cache/)).toBeInTheDocument();
-    expect(mockApi.getFact).toHaveBeenCalledTimes(1);
+    expect(mockApi.generateFact).toHaveBeenCalledTimes(1);
 
     // Explicit request: always goes to the server.
-    mockApi.getFact.mockImplementation(async () => ({ ...fact("Up"), id: "f2", content: "Another Up fact." }));
+    mockApi.generateFact.mockImplementation(async () => ({ ...fact("Up"), id: "f2", content: "Another Up fact." }));
     await user.click(screen.getByRole("button", { name: "New fact" }));
     expect(await screen.findByText("Another Up fact.")).toBeInTheDocument();
-    expect(mockApi.getFact).toHaveBeenCalledTimes(2);
+    expect(mockApi.generateFact).toHaveBeenCalledTimes(2);
   });
 
   it("shows an error with a retry when fact generation fails", async () => {
-    mockApi.getFact.mockRejectedValueOnce(
+    mockApi.generateFact.mockRejectedValueOnce(
       new ApiError(502, "FACT_GENERATION_FAILED", "Couldn't generate a fact right now."),
     );
     const { user } = renderDashboard();
@@ -250,5 +251,25 @@ describe("fact caching", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't generate a fact right now.");
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Fun fact about Up.")).toBeInTheDocument();
+  });
+});
+
+describe("unrecognized titles", () => {
+  it("says the fact is about a similar film when the model didn't recognize the title", async () => {
+    mockApi.generateFact.mockImplementation(async () => ({
+      ...fact("Up"),
+      content: "The Blob (1958) used colored silicone.",
+      recognized: false,
+    }));
+    renderDashboard();
+
+    expect(await screen.findByText("The Blob (1958) used colored silicone.")).toBeInTheDocument();
+    expect(screen.getByText(/We couldn.t find a movie called “Up”/)).toBeInTheDocument();
+  });
+
+  it("shows no notice for a recognized title", async () => {
+    renderDashboard();
+    expect(await screen.findByText("Fun fact about Up.")).toBeInTheDocument();
+    expect(screen.queryByText(/We couldn.t find a movie/)).not.toBeInTheDocument();
   });
 });

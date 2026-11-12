@@ -15,7 +15,7 @@ import { FactCard } from "./FactCard";
  * State ownership:
  * - `movie` is the title shown on screen. During a save it holds the
  *   optimistic new value; otherwise it matches what the server has stored.
- * - The fact hook gets `null` while saving, which pauses it. GET /api/fact
+ * - The fact hook gets `null` while saving, which pauses it. POST /api/fact
  *   reads the movie from the database, so a fetch mid-save could return a
  *   fact about the old title.
  */

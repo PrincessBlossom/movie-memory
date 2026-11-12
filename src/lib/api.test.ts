@@ -49,6 +49,29 @@ describe("api client: success", () => {
     expect(init?.method).toBe("PUT");
     expect(JSON.parse(init?.body as string)).toEqual({ movie: "Up" });
   });
+
+  const storedFact = {
+    id: "f1",
+    movie: "Up",
+    content: "A fact.",
+    recognized: true,
+    createdAt: "2026-11-11T00:00:00.000Z",
+  };
+
+  it("generates a fact with POST /api/fact", async () => {
+    const fetchSpy = mockFetch(() => json(200, { fact: storedFact }));
+    await expect(api.generateFact()).resolves.toEqual(storedFact);
+
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe("/api/fact");
+    expect(init?.method).toBe("POST");
+  });
+
+  it("reads the latest fact with GET /api/fact, which may be null", async () => {
+    const fetchSpy = mockFetch(() => json(200, { fact: null }));
+    await expect(api.getLatestFact()).resolves.toBeNull();
+    expect(fetchSpy.mock.calls[0]![1]?.method).toBeUndefined(); // fetch's default: GET
+  });
 });
 
 describe("api client: error normalization", () => {
@@ -70,7 +93,7 @@ describe("api client: error normalization", () => {
 
   it("500 with a non-JSON body → INTERNAL_ERROR with a generic message", async () => {
     mockFetch(() => Promise.resolve(new Response("<html>Internal Server Error</html>", { status: 500 })));
-    const err = await captureError(api.getFact());
+    const err = await captureError(api.generateFact());
     expect(err).toMatchObject({ status: 500, code: "INTERNAL_ERROR" });
     expect(err.message).toBe("Something went wrong. Please try again.");
   });
@@ -83,14 +106,14 @@ describe("api client: error normalization", () => {
 
   it("network failure → NETWORK_ERROR with status 0", async () => {
     mockFetch(() => Promise.reject(new TypeError("Failed to fetch")));
-    const err = await captureError(api.getFact());
+    const err = await captureError(api.generateFact());
     expect(err).toMatchObject({ status: 0, code: "NETWORK_ERROR" });
   });
 
   it("2xx that violates the contract → INVALID_RESPONSE", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     mockFetch(() => json(200, { fact: { content: "missing fields" } }));
-    const err = await captureError(api.getFact());
+    const err = await captureError(api.generateFact());
     expect(err).toMatchObject({ status: 200, code: "INVALID_RESPONSE" });
   });
 });

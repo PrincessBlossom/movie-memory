@@ -25,7 +25,7 @@ beforeEach(() => {
   mockReads([]);
   mocks.generateMovieFact.mockImplementation(async () => {
     await new Promise((r) => setTimeout(r, 10)); // OpenAI takes a while
-    return "A fact.";
+    return { content: "A fact.", recognized: true };
   });
   mocks.create.mockImplementation(async ({ data }) => ({
     id: `fact-${mocks.create.mock.calls.length}`,
@@ -79,7 +79,7 @@ describe("createFactForUser", () => {
     }
     expect(mocks.generateMovieFact).toHaveBeenCalledWith("Up", ["Old fact 1.", "Old fact 2."]);
     expect(mocks.create).toHaveBeenCalledWith({
-      data: { userId: "u1", movie: "Up", content: "A fact." },
+      data: { userId: "u1", movie: "Up", content: "A fact.", recognized: true },
     });
   });
 

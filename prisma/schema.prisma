@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL") // pooled: used by the app at runtime
   directUrl = env("DATABASE_URL_UNPOOLED") // direct: used by prisma migrate
 }
@@ -32,11 +32,14 @@ model User {
 /// so a fact about an old favorite is never mistaken for one about the current
 /// favorite after the user changes it.
 model Fact {
-  id        String   @id @default(cuid())
-  userId    String
-  movie     String
-  content   String
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  movie      String
+  content    String
+  // false when the model couldn't identify the title, so `content` is about a
+  // similarly named or related film. The UI says so.
+  recognized Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

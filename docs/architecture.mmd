@@ -17,7 +17,7 @@ flowchart TB
     subgraph Routes["Route handlers"]
       Me["GET /api/me"]
       Movie["PUT /api/me/movie"]
-      FactRoute["GET /api/fact"]
+      FactRoute["POST /api/fact (generate)<br/>GET /api/fact (latest)"]
       SessionId["getSessionUserId()"]
     end
     Facts["lib/facts.ts<br/>coalescing + 5/min limit"]

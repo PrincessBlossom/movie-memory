@@ -11,7 +11,8 @@
  * Endpoints
  *   GET  /api/me        → 200 MeResponse          | 401
  *   PUT  /api/me/movie  → 200 UpdateMovieResponse | 400, 401
- *   GET  /api/fact      → 200 FactResponse        | 401, 409, 429, 502
+ *   GET  /api/fact      → 200 LatestFactResponse  | 401, 409       (read only)
+ *   POST /api/fact      → 200 FactResponse        | 401, 409, 429, 502 (generates)
  *
  * Every non-2xx response has the same shape: ApiErrorBody.
  */
@@ -63,6 +64,11 @@ export const factSchema = z.object({
   /** Snapshot of the movie this fact is about (may differ from the current favorite). */
   movie: z.string(),
   content: z.string(),
+  /**
+   * false if the model couldn't identify the title, in which case `content`
+   * is about a similarly named or related film and the UI says so.
+   */
+  recognized: z.boolean(),
   /** ISO 8601 timestamp. */
   createdAt: z.string(),
 });
@@ -83,5 +89,10 @@ export type UpdateMovieRequest = z.input<typeof updateMovieRequestSchema>;
 export const updateMovieResponseSchema = z.object({ favoriteMovie: z.string() });
 export type UpdateMovieResponse = z.infer<typeof updateMovieResponseSchema>;
 
+/** POST /api/fact: the newly generated fact. */
 export const factResponseSchema = z.object({ fact: factSchema });
 export type FactResponse = z.infer<typeof factResponseSchema>;
+
+/** GET /api/fact: the latest stored fact about the current favorite movie, if any. */
+export const latestFactResponseSchema = z.object({ fact: factSchema.nullable() });
+export type LatestFactResponse = z.infer<typeof latestFactResponseSchema>;
