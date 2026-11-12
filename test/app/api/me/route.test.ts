@@ -39,4 +39,15 @@ describe("GET /api/me", () => {
       select: { name: true, email: true, image: true, favoriteMovie: true },
     });
   });
+
+  it("answers 500 INTERNAL_ERROR with a contract body when the database throws", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.findUnique.mockRejectedValue(new Error("db down"));
+    const res = await GET();
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." },
+    });
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
+  });
 });

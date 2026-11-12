@@ -74,6 +74,13 @@ describe.each([
     expect(res.status).toBe(409);
     expect((await res.json()).error.code).toBe("NO_FAVORITE_MOVIE");
   });
+
+  it("answers 500 INTERNAL_ERROR with a contract body when the database throws", async () => {
+    mocks.findUnique.mockRejectedValue(new Error("db down"));
+    const res = await handler();
+    expect(res.status).toBe(500);
+    expect((await res.json()).error.code).toBe("INTERNAL_ERROR");
+  });
 });
 
 describe("GET /api/fact (read only)", () => {

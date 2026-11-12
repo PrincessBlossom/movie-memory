@@ -8,6 +8,7 @@ import {
   jsonError,
   jsonOk,
   unauthorized,
+  withErrorHandling,
 } from "@/lib/api-server";
 import { prisma } from "@/lib/prisma";
 
@@ -18,7 +19,7 @@ import { prisma } from "@/lib/prisma";
  * same body twice leaves the same state. The route is "/me/...", not
  * "/users/:id/...", so there's no id in the URL for a caller to tamper with.
  */
-export async function PUT(request: Request) {
+export const PUT = withErrorHandling(async (request: Request) => {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
 
@@ -46,4 +47,4 @@ export async function PUT(request: Request) {
 
   // Return the normalized (trimmed) value so the client can reconcile its optimistic state with exactly what was stored.
   return jsonOk<UpdateMovieResponse>({ favoriteMovie: parsed.data.movie });
-}
+});

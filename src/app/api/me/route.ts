@@ -1,9 +1,9 @@
 import type { MeResponse } from "@/lib/api-contract";
-import { getSessionUserId, jsonOk, unauthorized } from "@/lib/api-server";
+import { getSessionUserId, jsonOk, unauthorized, withErrorHandling } from "@/lib/api-server";
 import { prisma } from "@/lib/prisma";
 
 /** GET /api/me: the signed-in user's profile and favorite movie. */
-export async function GET() {
+export const GET = withErrorHandling(async () => {
   const userId = await getSessionUserId();
   if (!userId) return unauthorized();
 
@@ -16,4 +16,4 @@ export async function GET() {
   if (!user) return unauthorized();
 
   return jsonOk<MeResponse>({ user });
-}
+});

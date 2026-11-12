@@ -29,6 +29,24 @@ export const unauthorized = () =>
   jsonError(401, "UNAUTHORIZED", "You need to sign in.");
 
 /**
+ * Wraps a route handler so anything it throws becomes a contract-shaped
+ * `500 INTERNAL_ERROR` instead of Next.js's default empty-body 500. Expected
+ * failures (401, 409, 502, ...) are still handled inside each route.
+ */
+export function withErrorHandling<A extends unknown[]>(
+  handler: (...args: A) => Promise<Response>,
+) {
+  return async (...args: A): Promise<Response> => {
+    try {
+      return await handler(...args);
+    } catch (err) {
+      console.error("Unhandled API error", err);
+      return jsonError(500, "INTERNAL_ERROR", "Something went wrong. Please try again.");
+    }
+  };
+}
+
+/**
  * The user id from the session, or null. Every route scopes its database
  * queries by this id. It is never read from the URL or request body, so a
  * user cannot address another user's data. A database outage throws (see

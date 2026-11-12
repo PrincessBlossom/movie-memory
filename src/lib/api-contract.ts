@@ -9,12 +9,13 @@
  * This file must stay importable from client code: no Prisma, no secrets.
  *
  * Endpoints
- *   GET  /api/me        → 200 MeResponse          | 401
- *   PUT  /api/me/movie  → 200 UpdateMovieResponse | 400, 401
- *   GET  /api/fact      → 200 LatestFactResponse  | 401, 409       (read only)
- *   POST /api/fact      → 200 FactResponse        | 401, 409, 429, 502 (generates)
+ *   GET  /api/me        → 200 MeResponse          | 401, 500
+ *   PUT  /api/me/movie  → 200 UpdateMovieResponse | 400, 401, 500
+ *   GET  /api/fact      → 200 LatestFactResponse  | 401, 409, 500       (read only)
+ *   POST /api/fact      → 200 FactResponse        | 401, 409, 429, 502, 500 (generates)
  *
- * Every non-2xx response has the same shape: ApiErrorBody.
+ * Every non-2xx response has the same shape: ApiErrorBody. Unexpected errors
+ * (e.g. a database outage) become 500 INTERNAL_ERROR via withErrorHandling.
  */
 import { z } from "zod";
 import { movieTitleSchema } from "@/lib/validation";

@@ -5,6 +5,7 @@ import {
   jsonError,
   jsonOk,
   unauthorized,
+  withErrorHandling,
 } from "@/lib/api-server";
 import { createFactForUser, FactRateLimitError, getLatestFact } from "@/lib/facts";
 import { FactGenerationError } from "@/lib/openai";
@@ -56,15 +57,15 @@ function toDto(fact: FactRow): Fact {
   };
 }
 
-export async function GET() {
+export const GET = withErrorHandling(async () => {
   const resolved = await resolveMovie();
   if (resolved instanceof Response) return resolved;
 
   const fact = await getLatestFact(resolved.userId, resolved.movie);
   return jsonOk<LatestFactResponse>({ fact: fact && toDto(fact) });
-}
+});
 
-export async function POST() {
+export const POST = withErrorHandling(async () => {
   const resolved = await resolveMovie();
   if (resolved instanceof Response) return resolved;
 
@@ -95,4 +96,4 @@ export async function POST() {
       "Couldn't generate a fact right now. Please try again.",
     );
   }
-}
+});
