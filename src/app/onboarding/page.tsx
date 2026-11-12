@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
+import { saveFavoriteMovie } from "./actions";
 import { OnboardingForm } from "./OnboardingForm";
 
 export default async function OnboardingPage() {
@@ -18,7 +19,7 @@ export default async function OnboardingPage() {
           add the year, e.g. Dune (1984).
         </p>
       </div>
-      <OnboardingForm />
+      <OnboardingForm action={saveFavoriteMovie} />
     </div>
   );
 }

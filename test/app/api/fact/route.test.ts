@@ -27,7 +27,7 @@ vi.mock("@/lib/openai", () => ({
 
 import { FactRateLimitError } from "@/lib/facts";
 import { FactGenerationError } from "@/lib/openai";
-import { GET, POST } from "./route";
+import { GET, POST } from "@/app/api/fact/route";
 
 const row = {
   id: "f1",

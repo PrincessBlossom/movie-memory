@@ -33,7 +33,7 @@ export default function ErrorPage({
         Try again
       </button>
       {error.digest && (
-        // The digest matches the server log entry, useful for bug reports.
+        // error log
         <p className="text-xs text-ink/70">Error reference: {error.digest}</p>
       )}
     </div>

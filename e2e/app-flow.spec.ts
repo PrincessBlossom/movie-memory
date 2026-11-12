@@ -99,6 +99,22 @@ test("sign-in, onboarding and dashboard", async ({ page, context, baseURL }) => 
     expect(saved.favoriteMovie).toBeNull();
   });
 
+  await test.step("onboarding shows an over-limit title as an error", async () => {
+    const input = page.getByLabel("Favorite movie");
+    await input.fill("x".repeat(205)); // not cut off: no maxLength
+    await expect(page.getByText("205 / 200 characters (5 over the limit)")).toBeVisible();
+
+    const form = page.locator("form", { has: input });
+    const formReset = form.evaluate(
+      (el) => new Promise<void>((done) => el.addEventListener("reset", () => done(), { once: true })),
+    );
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(input).toHaveAccessibleDescription(/Movie title must be at most 200 characters\./);
+    await formReset;
+    await expect(input).toHaveValue("x".repeat(205)); // kept after React's form reset
+    await expect(page).toHaveURL("/onboarding");
+  });
+
   await test.step("onboarding saves the movie and opens the dashboard", async () => {
     await page.getByLabel("Favorite movie").fill("  Spirited Away  ");
     await page.getByRole("button", { name: "Continue" }).click();

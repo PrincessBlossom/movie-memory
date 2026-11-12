@@ -11,8 +11,7 @@ export default async function LandingPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  // Signed-in users never see the landing page. /dashboard decides whether
-  // they still need onboarding.
+  // Signed-in users don't see this landing page after they have signed in
   const session = await auth();
   if (session?.user) redirect("/dashboard");
 

@@ -99,14 +99,19 @@ src/lib/validation.ts       Shared zod schema for movie titles
 src/lib/openai.ts           Server-only OpenAI call
 src/lib/facts.ts            Generates and stores facts
 src/app/page.tsx            Landing page
-src/app/onboarding/         Favorite-movie form + server action
-src/app/dashboard/          Dashboard: server page + client MovieDashboard, editor, fact card
+src/app/onboarding/         Favorite-movie form (UI only) + server action (validation, save)
+src/app/dashboard/
+  page.tsx                  Server entry: auth, onboarding redirect, seeds the shell
+  DashboardShell.tsx        The shell: state, API calls, validation, refresh, sign-out
+  useFact.ts                Fact loading: cache, dedupe, stale-response protection
+  types.ts                  Shell state types and component view models
+  transforms.ts             Pure functions: API data → view models, draft validation
+  components/               UI only: ProfileHeader, Avatar, FavoriteMovieEditor, FactCard
 src/app/api/                Route handlers: /api/me, /api/me/movie, /api/fact
 src/lib/api-contract.ts     Shared request/response schemas + error codes (server & client)
 src/lib/api-server.ts       Server helpers: consistent JSON/error responses, session user id
 src/lib/api.ts              Typed client: validates responses, normalizes errors to ApiError
 src/lib/fact-cache.ts       30s client-side fact cache (sessionStorage)
-src/hooks/useFact.ts        Fact loading: cache, dedupe, stale-response protection
 ```
 
 ## API
@@ -136,7 +141,7 @@ flowchart TB
     Pages["Server-rendered pages<br/>/ · /onboarding · /dashboard"]
     subgraph Client["Client components"]
       direction LR
-      Dashboard[MovieDashboard] --> UseFact[useFact] --> ApiClient[lib/api.ts]
+      Dashboard[DashboardShell] --> UseFact[useFact] --> ApiClient[lib/api.ts]
       UseFact <--> Cache[("lib/fact-cache.ts<br/>sessionStorage, 30s TTL")]
     end
   end
@@ -191,7 +196,7 @@ flowchart TB
 
 ### Validation and authorization
 
-- One zod schema (`lib/validation.ts`) trims the title and enforces 1–200 characters. The onboarding server action and `PUT /api/me/movie` both use it; the client uses it too, but only as a UX shortcut.
+- One zod schema (`lib/validation.ts`) trims the title and enforces 1–200 characters. The onboarding server action and `PUT /api/me/movie` both use it; the client uses it too, but only as a UX shortcut. The inputs deliberately have no `maxLength`, which would silently stop typing or cut off a pasted title. Instead a character counter (`lib/title-length.ts`) appears within 40 characters of the limit and turns red past it, and submitting shows the validation message.
 - The onboarding write is a conditional update (`WHERE favoriteMovie IS NULL`), so a replayed request or a second tab cannot overwrite an existing movie.
 - Every query is scoped by the session's user id. Routes are `/api/me/...` with no id in the URL or body, so there is nothing for a caller to tamper with.
 
@@ -203,7 +208,8 @@ flowchart TB
 
 ### Client state
 
-- `MovieDashboard` owns `movie` (what is on screen) and `isSaving`. On save it shows the new title immediately, then either adopts the server's normalized value or reverts and reopens the editor with the user's text and the error.
+- **Shell and components.** `DashboardShell` is the only part of the dashboard with state or I/O: it holds the state, calls the API client, validates the movie draft, and decides which state the fact card is in. The components in `dashboard/components/` are UI only: data comes in through props and events go out through callbacks, with no fetching, API client imports or business rules. Their only state is UI state: the avatar's fallback when the photo fails and focus handling. Pure functions in `transforms.ts` turn API data into the view models the components render (`toProfileView`, `toFactCardView`, `validateMovieDraft`, `toSaveFieldError`), and the types live in `types.ts`. The onboarding page follows the same rule: it passes the server action to the form as a prop.
+- `DashboardShell` owns `movie` (what is on screen), `isSaving` and the editor (open, draft, error). On save it shows the new title immediately, then either adopts the server's normalized value or reverts and reopens the editor with the user's text and the error.
 - After a network error the outcome is ambiguous (the save may have landed), so it re-reads `GET /api/me` and adopts what the server actually has. A save counter stops a late reconciliation overwriting a newer edit.
 - `useFact` is paused while a save is in flight, because `POST /api/fact` reads the movie from the database and could otherwise return a fact for the old title. It also:
   - checks the cache first unless the user clicked **New fact**;
@@ -230,17 +236,18 @@ flowchart TB
 
 ### Tests
 
-`npm test` runs 68 Vitest tests in eight files:
+`npm test` runs 88 Vitest tests in nine files. Tests live in `test/`, mirroring the `src/` layout (`test/lib/api.test.ts` tests `src/lib/api.ts`), with shared setup in `test/setup.ts`:
 | File | Covers |
 | --- | --- |
-| `src/lib/api.test.ts` | Client success paths (including `POST` vs `GET` on `/api/fact`) and error normalization (401, 400, 500 non-JSON, network failure, invalid 2xx) |
-| `src/lib/fact-cache.test.ts` | 30s TTL boundary, movie and user keying, invalidation, corrupt storage |
-| `src/app/dashboard/MovieDashboard.test.tsx` | Edit flow: optimistic update, revert on failure, cancel, validation, session expiry, network-error reconciliation, focus handling, cache reuse, the "couldn't find that movie" notice |
-| `src/lib/facts.test.ts` | Server throttle: concurrent requests share one call, per-user limit with `Retry-After`, previous facts passed to the prompt |
-| `src/lib/openai.test.ts` | Default model, Structured Outputs request, `recognized` flag, malformed or empty replies, OpenAI 429 |
-| `src/app/api/fact/route.test.ts` | `GET` and `POST /api/fact`: 401, deleted user, 409; `GET` reads without generating; `POST` success shape, 429 (ours and OpenAI's), 502 |
-| `src/app/api/me/route.test.ts` | `GET /api/me`: 401, deleted user, selected fields, `no-store` |
-| `src/app/api/me/movie/route.test.ts` | `PUT /api/me/movie`: 401, validation, trimming, session-scoped write |
+| `test/lib/api.test.ts` | Client success paths (including `POST` vs `GET` on `/api/fact`) and error normalization (401, 400, 500 non-JSON, network failure, invalid 2xx) |
+| `test/lib/fact-cache.test.ts` | 30s TTL boundary, movie and user keying, invalidation, corrupt storage |
+| `test/app/dashboard/transforms.test.ts` | Pure view-model functions: profile fallbacks and initials, draft validation, save-error mapping, every fact card state |
+| `test/app/dashboard/DashboardShell.test.tsx` | Profile header and sign-out; edit flow: optimistic update, revert on failure, cancel, validation, session expiry, network-error reconciliation, focus handling, cache reuse, the "couldn't find that movie" notice |
+| `test/lib/facts.test.ts` | Server throttle: concurrent requests share one call, per-user limit with `Retry-After`, previous facts passed to the prompt |
+| `test/lib/openai.test.ts` | Default model, Structured Outputs request, `recognized` flag, malformed or empty replies, OpenAI 429 |
+| `test/app/api/fact/route.test.ts` | `GET` and `POST /api/fact`: 401, deleted user, 409; `GET` reads without generating; `POST` success shape, 429 (ours and OpenAI's), 502 |
+| `test/app/api/me/route.test.ts` | `GET /api/me`: 401, deleted user, selected fields, `no-store` |
+| `test/app/api/me/movie/route.test.ts` | `PUT /api/me/movie`: 401, validation, trimming, session-scoped write |
 
 `npm run test:e2e` runs one Playwright test (`e2e/app-flow.spec.ts`) in Chromium against a real `next dev` server and the database in `DATABASE_URL`. It walks the whole flow: the sign-in button's OAuth redirect, the signed-out redirect, onboarding (including server-side rejection of a blank title), the dashboard profile and fact, the 30s cache on reload, the inline edit, and log out, checking the database at each step.
 

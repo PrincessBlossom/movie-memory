@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { updateMany: mocks.updateMany } } }));
 
-import { PUT } from "./route";
+import { PUT } from "@/app/api/me/movie/route";
 
 const put = (body: unknown) =>
   PUT(

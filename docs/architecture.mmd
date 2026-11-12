@@ -4,7 +4,7 @@ flowchart TB
     Pages["Server-rendered pages<br/>/ · /onboarding · /dashboard"]
     subgraph Client["Client components"]
       direction LR
-      Dashboard[MovieDashboard] --> UseFact[useFact] --> ApiClient[lib/api.ts]
+      Dashboard[DashboardShell] --> UseFact[useFact] --> ApiClient[lib/api.ts]
       UseFact <--> Cache[("lib/fact-cache.ts<br/>sessionStorage, 30s TTL")]
     end
   end

@@ -11,7 +11,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/openai", () => ({ generateMovieFact: mocks.generateMovieFact }));
 
-import { FACT_RATE_LIMIT, FactRateLimitError, createFactForUser } from "./facts";
+import { FACT_RATE_LIMIT, FactRateLimitError, createFactForUser } from "@/lib/facts";
 
 /** findMany is called twice per generation: [recent (rate limit), previous (no-repeat)]. */
 function mockReads(recent: { createdAt: Date }[], previous: { content: string }[] = []) {

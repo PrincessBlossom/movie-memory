@@ -16,7 +16,7 @@ vi.mock("openai", () => {
 });
 
 import OpenAI from "openai";
-import { FactGenerationError, MODEL, generateMovieFact } from "./openai";
+import { FactGenerationError, MODEL, generateMovieFact } from "@/lib/openai";
 
 const reply = (output_text: string) => ({ output_text, status: "completed", incomplete_details: null });
 

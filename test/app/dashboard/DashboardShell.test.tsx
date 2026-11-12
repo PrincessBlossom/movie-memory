@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Fact } from "@/lib/api-contract";
 import { ApiError, api } from "@/lib/api";
-import { MovieDashboard } from "./MovieDashboard";
+import { signOutAction } from "@/app/actions";
+import { factCache } from "@/lib/fact-cache";
+import { DashboardShell } from "@/app/dashboard/DashboardShell";
 
 // A stable router object, like the real one (a new object per render would
 // re-trigger effects that depend on it).
@@ -17,6 +19,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
     api: { getMe: vi.fn(), updateMovie: vi.fn(), generateFact: vi.fn(), getLatestFact: vi.fn() },
   };
 });
+
+// The real server action imports Auth.js; the shell only needs to call it.
+vi.mock("@/app/actions", () => ({ signOutAction: vi.fn() }));
 
 const mockApi = vi.mocked(api);
 
@@ -41,7 +46,13 @@ function deferred<T>() {
 
 function renderDashboard() {
   const user = userEvent.setup();
-  const utils = render(<MovieDashboard userId="user-1" initialMovie="Up" />);
+  const utils = render(
+    <DashboardShell
+      userId="user-1"
+      user={{ name: "Ada Lovelace", email: "ada@example.com", image: null }}
+      initialMovie="Up"
+    />,
+  );
   return { user, ...utils };
 }
 
@@ -173,6 +184,31 @@ describe("movie edit flow", () => {
   });
 });
 
+describe("title length", () => {
+  it("shows a counter near the limit, and a visible error past it, without a request", async () => {
+    const { user } = renderDashboard();
+    await screen.findByText("Fun fact about Up.");
+    await user.click(screen.getByRole("button", { name: "Edit favorite movie" }));
+    const input = screen.getByLabelText("Favorite movie");
+    await user.clear(input);
+
+    // Pasting a long title isn't cut off at 200 (no maxLength).
+    await user.click(input);
+    await user.paste("x".repeat(170));
+    expect(screen.getByText("170 / 200 characters")).toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-invalid", "false");
+
+    await user.paste("x".repeat(40));
+    expect(input).toHaveValue("x".repeat(210));
+    expect(screen.getByText("210 / 200 characters (10 over the limit)")).toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Movie title must be at most 200 characters.");
+    expect(mockApi.updateMovie).not.toHaveBeenCalled();
+  });
+});
+
 describe("keyboard accessibility", () => {
   it("returns focus to the Edit button after Cancel, Escape and Save", async () => {
     const { user } = renderDashboard();
@@ -271,5 +307,25 @@ describe("unrecognized titles", () => {
     renderDashboard();
     expect(await screen.findByText("Fun fact about Up.")).toBeInTheDocument();
     expect(screen.queryByText(/We couldn.t find a movie/)).not.toBeInTheDocument();
+  });
+});
+
+describe("profile header and sign-out", () => {
+  it("shows the profile the shell was given, with initials when there's no photo", async () => {
+    renderDashboard();
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    expect(screen.getByText("AL")).toBeInTheDocument();
+    await screen.findByText("Fun fact about Up.");
+  });
+
+  it("clears the fact cache and calls the sign-out action on Log out", async () => {
+    const clear = vi.spyOn(factCache, "clear");
+    const { user } = renderDashboard();
+    await screen.findByText("Fun fact about Up.");
+
+    await user.click(screen.getByRole("button", { name: "Log out" }));
+    await waitFor(() => expect(signOutAction).toHaveBeenCalledTimes(1));
+    expect(clear).toHaveBeenCalled();
   });
 });

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ auth: vi.fn(), findUnique: vi.fn() }));
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: mocks.findUnique } } }));
 
-import { GET } from "./route";
+import { GET } from "@/app/api/me/route";
 
 beforeEach(() => {
   vi.resetAllMocks();

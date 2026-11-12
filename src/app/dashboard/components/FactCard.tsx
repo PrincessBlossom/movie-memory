@@ -1,24 +1,14 @@
 "use client";
 
-import type { FactState } from "@/hooks/useFact";
+import type { FactCardView } from "../types";
 
 /**
- * Renders every state of the fact lifecycle:
- * - waiting:  a movie edit is saving; the fact will follow
- * - loading:  skeleton (first load) or dimmed current fact (refresh)
- * - error:    message + retry; a previous fact stays visible if there is one
- * - empty:    nothing loaded and nothing in progress
- * - success:  the fact, its time, and whether it came from the 30s cache
+ * Renders the fact card. The shell has already decided which state applies
+ * (waiting, loading, fact, empty, error) and formatted everything; see
+ * toFactCardView in ../transforms.ts.
  */
-export function FactCard({
-  fact,
-  fromCache,
-  isLoading,
-  error,
-  refresh,
-  isWaitingForMovie,
-}: FactState & { refresh: () => void; isWaitingForMovie: boolean }) {
-  const busy = isLoading || isWaitingForMovie;
+export function FactCard({ view, onRefresh }: { view: FactCardView; onRefresh: () => void }) {
+  const { body, error, busy, refreshLabel } = view;
 
   return (
     <div className="space-y-3">
@@ -33,51 +23,39 @@ export function FactCard({
         <button
           type="button"
           onClick={() => {
-            if (!busy) refresh();
+            if (!busy) onRefresh();
           }}
           aria-disabled={busy}
           className="link-underline cursor-pointer text-sm font-semibold"
         >
-          {isLoading ? "Generating…" : "New fact"}
+          {refreshLabel}
         </button>
       </div>
 
       <div aria-live="polite" aria-busy={busy}>
-        {isWaitingForMovie ? (
-          <p className="text-ink/70">Saving your new movie. A fresh fact is on the way…</p>
-        ) : fact ? (
-          <div className={isLoading ? "opacity-50 transition-opacity" : undefined}>
-            {!fact.recognized && (
-              // The model couldn't identify the title, so the fact is about a
-              // similar film. Say so rather than pass it off as this movie.
-              <p className="mb-2 text-sm font-semibold text-ink/70">
-                We couldn&apos;t find a movie called “{fact.movie}”. Here&apos;s a fact
-                about a similar film instead. Adding the year, or checking the
-                spelling, can help.
-              </p>
+        {body.kind === "waiting" && <p className="text-ink/70">{body.message}</p>}
+        {body.kind === "loading" && <FactSkeleton />}
+        {body.kind === "empty" && <p className="text-ink/70">{body.message}</p>}
+        {body.kind === "fact" && (
+          <div className={body.dimmed ? "opacity-50 transition-opacity" : undefined}>
+            {body.notice && (
+              <p className="mb-2 text-sm font-semibold text-ink/70">{body.notice}</p>
             )}
-            <p className="leading-relaxed text-ink">{fact.content}</p>
-            <p className="mt-2 text-xs text-ink/70">
-              Generated {formatTime(fact.createdAt)}
-              {fromCache && " · from cache"}
-            </p>
+            <p className="leading-relaxed text-ink">{body.content}</p>
+            <p className="mt-2 text-xs text-ink/70">{body.meta}</p>
           </div>
-        ) : isLoading ? (
-          <FactSkeleton />
-        ) : error ? null : (
-          <p className="text-ink/70">No fact yet. Click “New fact” to get one.</p>
         )}
       </div>
 
-      {error && !isWaitingForMovie && (
+      {error && (
         <div
           role="alert"
           className="flex items-center justify-between gap-4 rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700"
         >
-          <span>{error.message}</span>
+          <span>{error}</span>
           <button
             type="button"
-            onClick={refresh}
+            onClick={onRefresh}
             className="cursor-pointer rounded px-2 py-1 font-semibold whitespace-nowrap underline"
           >
             Try again
@@ -91,14 +69,10 @@ export function FactCard({
 function FactSkeleton() {
   return (
     <div className="animate-pulse space-y-2">
-      {/* aria-label is ignored on a plain div; real text is announced. */}
+      {/* aria-label is ignored on a plain div; text is announced. */}
       <span className="sr-only">Loading fun fact…</span>
       <div aria-hidden="true" className="h-4 w-full rounded bg-ink/10" />
       <div aria-hidden="true" className="h-4 w-2/3 rounded bg-ink/10" />
     </div>
   );
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }

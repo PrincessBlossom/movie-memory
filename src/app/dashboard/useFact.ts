@@ -5,15 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Fact } from "@/lib/api-contract";
 import { ApiError, api, isApiError } from "@/lib/api";
 import { factCache } from "@/lib/fact-cache";
-
-export type FactState = {
-  /** The fact to show. Kept while a replacement loads, so the card doesn't flash. */
-  fact: Fact | null;
-  /** True if `fact` came from the cache rather than a request made by this component. */
-  fromCache: boolean;
-  isLoading: boolean;
-  error: ApiError | null;
-};
+import type { FactState } from "./types";
 
 const EMPTY: FactState = {
   fact: null,
@@ -57,8 +49,7 @@ export function useFact(userId: string, movie: string | null) {
     isLoading: movie !== null,
   }));
 
-  // Incremented on every new request and on cleanup. A response is applied
-  // only if its id is still the latest.
+  // Incremented on every new request and on cleanup. A response is applied only if its id is still the latest.
   const latestRequest = useRef(0);
 
   const load = useCallback(
@@ -68,7 +59,7 @@ export function useFact(userId: string, movie: string | null) {
       if (!force) {
         const hit = factCache.get(userId, movie);
         if (hit) {
-          latestRequest.current++; // supersede anything still in flight
+          latestRequest.current++; // supersedes any in-flight requests
           setState({ ...EMPTY, fact: hit.fact, fromCache: true });
           return;
         }
@@ -77,8 +68,7 @@ export function useFact(userId: string, movie: string | null) {
       const requestId = ++latestRequest.current;
       setState((prev) => ({
         ...prev,
-        // Keep showing the current fact while refreshing, but only if it's
-        // about this movie.
+        // Keep showing the current fact while refreshing, but only if it's about the currently chosen movie.
         fact: prev.fact?.movie === movie ? prev.fact : null,
         isLoading: true,
         error: null,
@@ -89,8 +79,7 @@ export function useFact(userId: string, movie: string | null) {
         if (requestId !== latestRequest.current) return; // stale
 
         if (fact.movie !== movie) {
-          // The server generated a fact for a different movie, so the
-          // favorite was changed elsewhere (e.g. another tab). Don't cache it.
+          // In this case, the server generated a fact for a different movie, so the favorite was changed elsewhere (e.g. another tab). Don't cache it.
           throw new ApiError(
             409,
             "MOVIE_OUT_OF_SYNC",
@@ -121,12 +110,9 @@ export function useFact(userId: string, movie: string | null) {
     } else {
       void load(false);
     }
-    // On movie change or unmount, invalidate any request still in flight.
+    // On movie change or unmount, invalidate any in-flight requests.
     return () => {
-      // Intentionally reads the ref at cleanup time: it's a request counter,
-      // not a DOM node, and bumping the *latest* value is the point.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      latestRequest.current++;
+      latestRequest.current++; // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, [movie, load]);
 

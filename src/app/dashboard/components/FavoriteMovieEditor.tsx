@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { ApiError } from "@/lib/api";
-import { MOVIE_MAX_LENGTH } from "@/lib/constants";
-import { movieTitleSchema } from "@/lib/validation";
-
-export type SaveResult = { ok: true } | { ok: false; error: ApiError };
+import { useEffect, useRef } from "react";
+import { TitleLengthHint } from "@/titlelength/TitleLengthHint";
+import type { LengthHint } from "@/types/length-hint";
 
 const labelClass = "text-xs font-semibold tracking-widest text-brand uppercase";
 const primaryButton =
@@ -14,79 +11,44 @@ const secondaryButton =
   "cursor-pointer rounded-lg border border-ink/20 px-4 py-2 text-sm font-semibold text-ink transition-colors duration-[750ms] hover:bg-mist";
 
 /**
- * Shows the favorite movie with an inline editor (Save + Cancel).
+ * The favorite movie with an inline editor (Save + Cancel). Fully controlled:
+ * the shell owns whether it's open, the draft, the error, and what Save does
+ * (validation, the optimistic update, reopening with the error on failure).
  *
- * Flow:
- * - Edit opens the input with the current title. Enter saves, Escape cancels.
- * - Input is validated with the same zod schema the server uses, so obvious
- *   errors are caught without a request. The server still re-validates.
- * - An unchanged title closes the editor without a request.
- * - Focus is managed for keyboard and screen reader users: opening the editor
- *   focuses the input, and closing it (Save, Cancel or Escape) returns focus to
- *   the Edit button, instead of losing it when the form unmounts.
- * - On save the editor closes right away and the parent shows the new title
- *   optimistically. If the save fails, the parent reverts the title, and the
- *   editor reopens with the user's text and the error, so nothing typed is lost.
+ * The component's own job is keyboard and screen reader behavior: Enter
+ * saves, Escape cancels, opening focuses the input, and closing returns
+ * focus to the Edit button instead of losing it when the form unmounts.
  */
 export function FavoriteMovieEditor({
   movie,
   isSaving,
+  isEditing,
+  draft,
+  error,
+  lengthHint,
+  onEdit,
+  onDraftChange,
   onSave,
+  onCancel,
 }: {
   movie: string;
   isSaving: boolean;
-  onSave: (title: string) => Promise<SaveResult>;
+  isEditing: boolean;
+  draft: string;
+  error: string | null;
+  /** Character counter near or past the limit, or null. */
+  lengthHint: LengthHint | null;
+  onEdit: () => void;
+  onDraftChange: (draft: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
   const editButton = useRef<HTMLButtonElement>(null);
-  const restoreFocus = useRef(false);
+  const wasEditing = useRef(isEditing);
   useEffect(() => {
-    if (!isEditing && restoreFocus.current) {
-      restoreFocus.current = false;
-      editButton.current?.focus();
-    }
+    if (wasEditing.current && !isEditing) editButton.current?.focus();
+    wasEditing.current = isEditing;
   }, [isEditing]);
-
-  function closeEditor() {
-    restoreFocus.current = true;
-    setIsEditing(false);
-  }
-
-  function startEditing() {
-    setDraft(movie);
-    setError(null);
-    setIsEditing(true);
-  }
-
-  function cancel() {
-    closeEditor();
-    setError(null);
-  }
-
-  async function save() {
-    const parsed = movieTitleSchema.safeParse(draft);
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid movie title.");
-      return;
-    }
-    const title = parsed.data;
-    if (title === movie) {
-      cancel();
-      return;
-    }
-
-    closeEditor();
-    setError(null);
-    const result = await onSave(title);
-    if (!result.ok && result.error.code !== "UNAUTHORIZED") {
-      setDraft(title);
-      setError(result.error.message);
-      setIsEditing(true);
-    }
-  }
 
   if (isEditing) {
     return (
@@ -94,7 +56,7 @@ export function FavoriteMovieEditor({
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void save();
+          onSave();
         }}
       >
         <label htmlFor="favorite-movie" className={labelClass}>
@@ -104,16 +66,20 @@ export function FavoriteMovieEditor({
           id="favorite-movie"
           type="text"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") cancel();
+            if (e.key === "Escape") onCancel();
           }}
-          maxLength={MOVIE_MAX_LENGTH}
           autoFocus
-          aria-invalid={error !== null}
-          aria-describedby={error ? "favorite-movie-error" : undefined}
+          aria-invalid={error !== null || lengthHint?.over === true}
+          aria-describedby={
+            [error && "favorite-movie-error", lengthHint && "favorite-movie-length"]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className="w-full rounded-lg border border-ink/20 bg-white px-4 py-2 text-lg font-semibold transition-colors duration-[750ms] focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
         />
+        {lengthHint && <TitleLengthHint id="favorite-movie-length" hint={lengthHint} />}
         {error && (
           <p id="favorite-movie-error" role="alert" className="text-sm text-red-600">
             {error}
@@ -123,7 +89,7 @@ export function FavoriteMovieEditor({
           <button type="submit" className={primaryButton}>
             Save
           </button>
-          <button type="button" onClick={cancel} className={secondaryButton}>
+          <button type="button" onClick={onCancel} className={secondaryButton}>
             Cancel
           </button>
         </div>
@@ -143,7 +109,7 @@ export function FavoriteMovieEditor({
           ref={editButton}
           type="button"
           onClick={() => {
-            if (!isSaving) startEditing();
+            if (!isSaving) onEdit();
           }}
           aria-disabled={isSaving}
           aria-label="Edit favorite movie"
