@@ -87,15 +87,15 @@ Open http://localhost:3000. The app must run on port 3000, because that is the r
 
 ## Scripts
 
-| Command                       | What it does                                        |
-| ----------------------------- | --------------------------------------------------- |
-| `npm run dev`                 | Start the dev server                                |
-| `npm run build` / `npm start` | Production build and start                          |
-| `npm run lint`                | ESLint                                              |
-| `npm run typecheck`           | TypeScript checks with no output files              |
-| `npm test`                    | Run the unit and route tests (Vitest)               |
-| `npm run test:e2e`            | Run the end-to-end test (Playwright, real database) |
-| `npm run db:up`               | Start local Postgres (Docker)                       |
+| Command                       | What it does                                                        |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `npm run dev`                 | Start the dev server                                                |
+| `npm run build` / `npm start` | Production build and start                                          |
+| `npm run lint`                | ESLint                                                              |
+| `npm run typecheck`           | TypeScript checks with no output files                              |
+| `npm test`                    | Run the unit and route tests (Vitest)                               |
+| `npm run test:e2e`            | Run the end-to-end test (Playwright, real database)                 |
+| `npm run db:up`               | Start local Postgres (Docker)                                       |
 | `npm run db:migrate`          | Create a new migration after a schema change (`prisma migrate dev`) |
 
 ## Project structure
@@ -139,12 +139,12 @@ docs/architecture.mmd       Architecture diagram (Mermaid)
 
 All endpoints act on the signed-in user (identified only by the session cookie) and return `Cache-Control: private, no-store`. Errors always have the shape `{ "error": { "code": "...", "message": "..." } }`.
 
-| Endpoint | Success | Errors |
-| --- | --- | --- |
-| `GET /api/me` | `200 { user: { name, email, image, favoriteMovie } }` | `401 UNAUTHORIZED` |
-| `PUT /api/me/movie` with body `{ movie }` | `200 { favoriteMovie }` (the trimmed, stored title) | `400 VALIDATION_ERROR`, `401` |
-| `POST /api/fact` | `200 { fact: { id, movie, content, recognized, createdAt } }` (generates and stores a new fact) | `401`, `409 NO_FAVORITE_MOVIE`, `429 RATE_LIMITED` (with `Retry-After` for the app's own limit; not when OpenAI returns 429), `502 FACT_GENERATION_FAILED` |
-| `GET /api/fact` | `200 { fact: { … } \| null }` (the latest stored fact about the current movie; no generation) | `401`, `409 NO_FAVORITE_MOVIE` |
+| Endpoint                                  | Success                                                                                         | Errors                                                                                                                                                     |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/me`                             | `200 { user: { name, email, image, favoriteMovie } }`                                           | `401 UNAUTHORIZED`                                                                                                                                         |
+| `PUT /api/me/movie` with body `{ movie }` | `200 { favoriteMovie }` (the trimmed, stored title)                                             | `400 VALIDATION_ERROR`, `401`                                                                                                                              |
+| `POST /api/fact`                          | `200 { fact: { id, movie, content, recognized, createdAt } }` (generates and stores a new fact) | `401`, `409 NO_FAVORITE_MOVIE`, `429 RATE_LIMITED` (with `Retry-After` for the app's own limit; not when OpenAI returns 429), `502 FACT_GENERATION_FAILED` |
+| `GET /api/fact`                           | `200 { fact: { … } \| null }` (the latest stored fact about the current movie; no generation)   | `401`, `409 NO_FAVORITE_MOVIE`                                                                                                                             |
 
 ## Variant chosen: B (Frontend/API-focused)
 
@@ -261,18 +261,18 @@ flowchart TB
 
 `npm test` runs 97 Vitest tests in ten files. Tests live in `test/`, mirroring the `src/` layout (`test/lib/api.test.ts` tests `src/lib/api.ts`), with shared setup in `test/setup.ts`:
 
-| File | Covers |
-| --- | --- |
-| `test/lib/api.test.ts` | Client success paths (including `POST` vs `GET` on `/api/fact`) and error normalization (401, 400, 500 non-JSON, network failure, invalid 2xx) |
-| `test/lib/fact-cache.test.ts` | 30s TTL boundary, movie and user keying, invalidation, corrupt storage |
-| `test/app/dashboard/transforms.test.ts` | Pure view-model functions: profile fallbacks and initials, draft validation, save-error mapping, every fact card state, the title-length counter |
+| File                                         | Covers                                                                                                                                                                                                                                                            |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test/lib/api.test.ts`                       | Client success paths (including `POST` vs `GET` on `/api/fact`) and error normalization (401, 400, 500 non-JSON, network failure, invalid 2xx)                                                                                                                    |
+| `test/lib/fact-cache.test.ts`                | 30s TTL boundary, movie and user keying, invalidation, corrupt storage                                                                                                                                                                                            |
+| `test/app/dashboard/transforms.test.ts`      | Pure view-model functions: profile fallbacks and initials, draft validation, save-error mapping, every fact card state, the title-length counter                                                                                                                  |
 | `test/app/dashboard/DashboardShell.test.tsx` | Profile header and sign-out; edit flow: optimistic update, revert on failure, cancel, validation, session expiry, network-error reconciliation, focus handling, cache reuse, the "couldn't find that movie" notice, the title-length counter and over-limit error |
-| `test/lib/facts.test.ts` | Server throttle: concurrent requests share one call, per-user limit with `Retry-After`, the limit holding across concurrent requests for different movies, previous facts passed to the prompt |
-| `test/lib/auth-session.test.ts` | `getSession()`: valid session, no cookie, invalid cookie with the database up, and a database outage rethrown |
-| `test/lib/openai.test.ts` | Default model, Structured Outputs request, `recognized` flag, malformed or empty replies, OpenAI 429 |
-| `test/app/api/fact/route.test.ts` | `GET` and `POST /api/fact`: 401, deleted user, 409; `GET` reads without generating; `POST` success shape, 429 (ours and OpenAI's), 502 |
-| `test/app/api/me/route.test.ts` | `GET /api/me`: 401, deleted user, selected fields, `no-store` |
-| `test/app/api/me/movie/route.test.ts` | `PUT /api/me/movie`: 401, validation, trimming, session-scoped write |
+| `test/lib/facts.test.ts`                     | Server throttle: concurrent requests share one call, per-user limit with `Retry-After`, the limit holding across concurrent requests for different movies, previous facts passed to the prompt                                                                    |
+| `test/lib/auth-session.test.ts`              | `getSession()`: valid session, no cookie, invalid cookie with the database up, and a database outage rethrown                                                                                                                                                     |
+| `test/lib/openai.test.ts`                    | Default model, Structured Outputs request, `recognized` flag, malformed or empty replies, OpenAI 429                                                                                                                                                              |
+| `test/app/api/fact/route.test.ts`            | `GET` and `POST /api/fact`: 401, deleted user, 409; `GET` reads without generating; `POST` success shape, 429 (ours and OpenAI's), 502                                                                                                                            |
+| `test/app/api/me/route.test.ts`              | `GET /api/me`: 401, deleted user, selected fields, `no-store`                                                                                                                                                                                                     |
+| `test/app/api/me/movie/route.test.ts`        | `PUT /api/me/movie`: 401, validation, trimming, session-scoped write                                                                                                                                                                                              |
 
 `npm run test:e2e` runs one Playwright test (`e2e/app-flow.spec.ts`) in Chromium against a real `next dev` server and the database in `DATABASE_URL`. It walks the whole flow: the sign-in button's OAuth redirect, the signed-out redirect, onboarding (including server-side rejection of a blank title, and the counter and error for an over-limit title), the dashboard profile and fact, the 30s cache on reload, the inline edit, and log out, checking the database at each step.
 
@@ -305,8 +305,8 @@ flowchart TB
 
 ## AI usage
 
-- I used Claude to help structure the application architecture. I also used Claude to help me set up the project and give me directions on Prisma, Neon, OpenAI, and Google OAuth integration.
-- I used Claude Code to help refine and test the application, as well as write Vitest and Playwright tests. I also used it to clean up the formatting of the application, including the README.
+- I used Claude to help validate the application architecture. I also used Claude to give me directions on Prisma, Neon, OpenAI, and Google OAuth integration.
+- I used Claude Code to help refine and test the application, as well as write Vitest and Playwright tests. I also used it to clean up the formatting of the application.
 
 ## Troubleshooting
 
