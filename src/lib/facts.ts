@@ -28,15 +28,40 @@ export class FactRateLimitError extends Error {
 const inflight = new Map<string, Promise<Fact>>();
 
 /**
+ * The last queued generation per user. Generations for one user run one at a
+ * time, so each rate-limit check counts the rows of the ones before it.
+ * Without this, requests for different movies (which coalescing doesn't
+ * merge) could all read the count before any of their rows landed, and all
+ * pass.
+ */
+const userQueue = new Map<string, Promise<unknown>>();
+
+function runSerially<T>(userId: string, task: () => Promise<T>): Promise<T> {
+  const previous = userQueue.get(userId) ?? Promise.resolve();
+  const run = previous.then(task, task);
+  const settled = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  userQueue.set(userId, settled);
+  void settled.then(() => {
+    if (userQueue.get(userId) === settled) userQueue.delete(userId);
+  });
+  return run;
+}
+
+/**
  * Generate, store and return a new fact about `movie` for this user.
  *
  * Cost protection:
  * 1. Concurrent requests for the same user + movie are coalesced (above).
- * 2. At most FACT_RATE_LIMIT.max facts per user per window, else FactRateLimitError.
+ * 2. A user's generations run one at a time, and each is allowed only if the
+ *    user has fewer than FACT_RATE_LIMIT.max facts in the window, else
+ *    FactRateLimitError. Within one process the limit is exact.
  *
  * Limitation: both guards are per server process. Across several instances,
- * concurrent bursts could slightly exceed the limit before rows land. A shared
- * store (Redis, or a Postgres advisory lock) would close that gap.
+ * concurrent bursts could exceed the limit before rows land. A shared store
+ * (Redis, or a Postgres advisory lock) would close that gap.
  *
  * `movie` is stored as a snapshot so facts stay tied to the title they were
  * generated for, even after the user changes their favorite.
@@ -45,7 +70,9 @@ export function createFactForUser(userId: string, movie: string): Promise<Fact> 
   const key = `${userId}\u0000${movie}`;
   let promise = inflight.get(key);
   if (!promise) {
-    promise = generateAndStore(userId, movie).finally(() => inflight.delete(key));
+    promise = runSerially(userId, () => generateAndStore(userId, movie)).finally(() =>
+      inflight.delete(key),
+    );
     inflight.set(key, promise);
   }
   return promise;

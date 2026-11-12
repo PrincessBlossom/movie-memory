@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { auth, signIn } from "@/auth";
+import { signIn } from "@/auth";
+import { getSession } from "@/lib/auth-session";
 
 const ERROR_MESSAGES: Record<string, string> = {
   AccessDenied: "Access was denied. Please try again.",
@@ -12,7 +13,7 @@ export default async function LandingPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   // Signed-in users don't see this landing page after they have signed in
-  const session = await auth();
+  const session = await getSession();
   if (session?.user) redirect("/dashboard");
 
   const { error } = await searchParams;

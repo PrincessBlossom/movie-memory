@@ -1,6 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getSession } from "@/lib/auth-session";
 import type { ApiErrorBody, ApiErrorCode } from "@/lib/api-contract";
 
 /**
@@ -31,9 +31,10 @@ export const unauthorized = () =>
 /**
  * The user id from the session, or null. Every route scopes its database
  * queries by this id. It is never read from the URL or request body, so a
- * user cannot address another user's data.
+ * user cannot address another user's data. A database outage throws (see
+ * getSession), so the route answers 500 rather than 401.
  */
 export async function getSessionUserId(): Promise<string | null> {
-  const session = await auth();
+  const session = await getSession();
   return session?.user?.id ?? null;
 }

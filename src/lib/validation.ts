@@ -3,8 +3,8 @@ import { MOVIE_MAX_LENGTH, MOVIE_MIN_LENGTH } from "@/lib/constants";
 
 /**
  * Single source of truth for movie-title validation. Used by the onboarding
- * server action (and later by PUT /api/me/movie), so client and server rules
- * can never disagree. Trimming happens *before* the length checks, so
+ * server action, PUT /api/me/movie (through updateMovieRequestSchema) and the
+ * dashboard's editor, so client and server rules can never disagree. Trimming happens *before* the length checks, so
  * "   " is rejected as empty.
  */
 export const movieTitleSchema = z

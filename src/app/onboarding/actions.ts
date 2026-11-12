@@ -19,7 +19,6 @@ export async function saveFavoriteMovie(
   if (!parsed.success) {
     return {
       error: z.treeifyError(parsed.error).errors[0] ?? "Invalid movie title.",
-      value: typeof raw === "string" ? raw : "",
     };
   }
 

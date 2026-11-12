@@ -88,4 +88,27 @@ describe("createFactForUser", () => {
     await expect(createFactForUser("u1", "Up")).rejects.toThrow("OpenAI down");
     await expect(createFactForUser("u1", "Up")).resolves.toMatchObject({ content: "A fact." });
   });
+
+  it("enforces the limit across concurrent requests for different movies", async () => {
+    // A stateful table: the rate-limit read sees the rows created so far.
+    const rows: { createdAt: Date }[] = [];
+    mocks.findMany.mockImplementation(async (args: { where: { movie?: string } }) =>
+      args.where.movie ? [] : rows.slice(0, FACT_RATE_LIMIT.max),
+    );
+    mocks.create.mockImplementation(async ({ data }) => {
+      const row = { id: `fact-${rows.length}`, createdAt: new Date(), ...data };
+      rows.push(row);
+      return row;
+    });
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 12 }, (_, i) => createFactForUser("u1", `Movie ${i}`)),
+    );
+
+    expect(mocks.generateMovieFact).toHaveBeenCalledTimes(FACT_RATE_LIMIT.max);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(FACT_RATE_LIMIT.max);
+    for (const r of results.filter((r) => r.status === "rejected")) {
+      expect(r.reason).toBeInstanceOf(FactRateLimitError);
+    }
+  });
 });

@@ -1,6 +1,7 @@
 # Movie Memory
 
 Sign in with Google, type in your favorite movie, and OpenAI will generate a fact about it for you!
+
 **Stack:** Next.js 15 (App Router) · TypeScript · React 19 · Tailwind CSS 4 · Postgres · Prisma 6 · Auth.js v5 (Google) · OpenAI API
 
 ## How to use
@@ -50,7 +51,8 @@ Here are the environment variables that you need to include in .env. Never share
 
 - Authorized JavaScript origin: `http://localhost:3000`
 - Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-  While the OAuth consent screen is in "Testing" mode, add your Google account as a test user.
+
+While the OAuth consent screen is in "Testing" mode, add your Google account as a test user.
 
 ### 3. Set up the database
 
@@ -95,6 +97,7 @@ Open http://localhost:3000.
 prisma/schema.prisma        Data model (User, Fact + Auth.js tables)
 src/auth.ts                 Auth.js config (Google provider, Prisma adapter)
 src/lib/session.ts          requireUser(): auth check used by every protected page/action
+src/lib/auth-session.ts     getSession(): auth() that throws on a database outage instead of "signed out"
 src/lib/validation.ts       Shared zod schema for movie titles
 src/lib/openai.ts           Server-only OpenAI call
 src/lib/facts.ts            Generates and stores facts
@@ -128,11 +131,12 @@ docs/architecture.mmd       Architecture diagram (Mermaid)
 ## API
 
 All endpoints act on the signed-in user (identified only by the session cookie) and return `Cache-Control: private, no-store`. Errors always have the shape `{ "error": { "code": "...", "message": "..." } }`.
+
 | Endpoint | Success | Errors |
 | --- | --- | --- |
 | `GET /api/me` | `200 { user: { name, email, image, favoriteMovie } }` | `401 UNAUTHORIZED` |
 | `PUT /api/me/movie` with body `{ movie }` | `200 { favoriteMovie }` (the trimmed, stored title) | `400 VALIDATION_ERROR`, `401` |
-| `POST /api/fact` | `200 { fact: { id, movie, content, recognized, createdAt } }` (generates and stores a new fact) | `401`, `409 NO_FAVORITE_MOVIE`, `429 RATE_LIMITED` (with `Retry-After`), `502 FACT_GENERATION_FAILED` |
+| `POST /api/fact` | `200 { fact: { id, movie, content, recognized, createdAt } }` (generates and stores a new fact) | `401`, `409 NO_FAVORITE_MOVIE`, `429 RATE_LIMITED` (with `Retry-After` for the app's own limit; not when OpenAI returns 429), `502 FACT_GENERATION_FAILED` |
 | `GET /api/fact` | `200 { fact: { … } \| null }` (the latest stored fact about the current movie; no generation) | `401`, `409 NO_FAVORITE_MOVIE` |
 
 ## Variant chosen: B (Frontend/API-focused)
@@ -235,26 +239,29 @@ flowchart TB
 - One call to the Responses API with a 15-second timeout and no automatic retries. The title is user input, so it is wrapped in delimiters and the instructions tell the model to treat it only as a title.
 - The default model is `gpt-6-luna`, the cheaper tier: it knows 2026 releases such as _Hoppers_ and answers in about 3–5 seconds. `OPENAI_MODEL=gpt-6.1-sol` switches to the larger model.
 - The reply uses Structured Outputs: JSON `{ recognized, fact }` checked by a schema. `recognized: false` means the model couldn't identify the title, so the fact is about a similarly named or related film; it is stored with the fact and the dashboard says so.
-- `lib/facts.ts` guards cost on the server. Concurrent requests for the same user and movie share one OpenAI call, and each user gets at most 5 facts per minute, counted from their own `Fact` rows; beyond that the route returns `429 RATE_LIMITED` with `Retry-After` and makes no OpenAI call.
+- `lib/facts.ts` guards cost on the server. Concurrent requests for the same user and movie share one OpenAI call, and each user gets at most 5 facts per minute, counted from their own `Fact` rows. A user's generations run one at a time, so each count includes the rows of the requests before it, even when the movie changes between requests; beyond the limit the route returns `429 RATE_LIMITED` with `Retry-After` and makes no OpenAI call.
 - The user's last five stored facts about the same movie are sent with the prompt, and the model is asked for a different fact, so repeated clicks don't return rewordings.
 - Any failure becomes a `FactGenerationError`. The route maps a rate limit to `429 RATE_LIMITED` and everything else (error, timeout, empty output) to `502 FACT_GENERATION_FAILED`, each with a friendly message. The UI shows the message with a **Try again** button and keeps any previous fact visible.
 
 ### Errors and security headers
 
 - `src/app/error.tsx` catches unexpected server errors (a database outage, for example) and shows a friendly page with **Try again** and a reference code. Details go to the server logs, not the screen.
+- Auth.js catches errors from the database session lookup and returns "no session", which on its own would turn an outage into a redirect to `/` or a `401`. `lib/auth-session.ts` wraps `auth()`: when there is no session but a session cookie was sent, it runs `SELECT 1`, and if that fails it rethrows. Pages then show `error.tsx` and the API answers `500 INTERNAL_ERROR`.
 - `next.config.ts` sets headers on every response: a Content Security Policy that blocks framing, plugins and `<base>` hijacking, plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` and `Permissions-Policy`.
 - If the Google profile photo fails to load, the avatar falls back to initials.
 
 ### Tests
 
-`npm test` runs 92 Vitest tests in nine files. Tests live in `test/`, mirroring the `src/` layout (`test/lib/api.test.ts` tests `src/lib/api.ts`), with shared setup in `test/setup.ts`:
+`npm test` runs 97 Vitest tests in ten files. Tests live in `test/`, mirroring the `src/` layout (`test/lib/api.test.ts` tests `src/lib/api.ts`), with shared setup in `test/setup.ts`:
+
 | File | Covers |
 | --- | --- |
 | `test/lib/api.test.ts` | Client success paths (including `POST` vs `GET` on `/api/fact`) and error normalization (401, 400, 500 non-JSON, network failure, invalid 2xx) |
 | `test/lib/fact-cache.test.ts` | 30s TTL boundary, movie and user keying, invalidation, corrupt storage |
 | `test/app/dashboard/transforms.test.ts` | Pure view-model functions: profile fallbacks and initials, draft validation, save-error mapping, every fact card state, the title-length counter |
 | `test/app/dashboard/DashboardShell.test.tsx` | Profile header and sign-out; edit flow: optimistic update, revert on failure, cancel, validation, session expiry, network-error reconciliation, focus handling, cache reuse, the "couldn't find that movie" notice, the title-length counter and over-limit error |
-| `test/lib/facts.test.ts` | Server throttle: concurrent requests share one call, per-user limit with `Retry-After`, previous facts passed to the prompt |
+| `test/lib/facts.test.ts` | Server throttle: concurrent requests share one call, per-user limit with `Retry-After`, the limit holding across concurrent requests for different movies, previous facts passed to the prompt |
+| `test/lib/auth-session.test.ts` | `getSession()`: valid session, no cookie, invalid cookie with the database up, and a database outage rethrown |
 | `test/lib/openai.test.ts` | Default model, Structured Outputs request, `recognized` flag, malformed or empty replies, OpenAI 429 |
 | `test/app/api/fact/route.test.ts` | `GET` and `POST /api/fact`: 401, deleted user, 409; `GET` reads without generating; `POST` success shape, 429 (ours and OpenAI's), 502 |
 | `test/app/api/me/route.test.ts` | `GET /api/me`: 401, deleted user, selected fields, `no-store` |
@@ -271,7 +278,7 @@ flowchart TB
 
 - **`/api/fact` is split into `GET` and `POST`.** The spec names `GET /api/fact`, but generating a fact stores a row and makes a paid OpenAI call, so it is neither safe nor idempotent, and browsers, prefetchers and crawlers are allowed to repeat a GET. Generation is therefore `POST /api/fact`, and `GET /api/fact` returns the latest stored fact without side effects. A POST also isn't sent with the session cookie from another site (`SameSite=Lax`), so a third-party page can't trigger it. On top of that, the client never refetches on its own, concurrent requests share one OpenAI call, and the server caps each user at 5 facts per minute. The dashboard doesn't use the `GET` yet.
 - **A custom `useFact` hook rather than React Query or SWR.** The app has one cached resource with unusual rules: a fixed 30-second window keyed by user and movie, paused while a movie save is in flight, and never refetched automatically, because every fetch is a paid OpenAI call. A library would mean turning off most of its defaults (refetch on focus, retries, background revalidation) and still writing the movie keying and save-pause logic around it. A small hook plus a cache with an injected clock was simpler to reason about and to unit-test. If the app grew more server state, React Query would be the better choice.
-- **The server throttle is per process.** Coalescing is an in-memory map and the rate limit is read-then-write, so with several server instances a burst could slightly exceed 5 per minute. A shared store (Redis, or a Postgres advisory lock) would make it exact; for one instance it is exact enough and needs no new infrastructure.
+- **The server throttle is per process.** Coalescing is an in-memory map, and the rate limit is made exact by running each user's generations one at a time in memory. With one instance the limit holds, even for a burst that changes the movie between requests. With several instances each process has its own queue, so a burst spread across them could exceed 5 per minute. A shared store (Redis, or a Postgres advisory lock) would close that gap but needs new infrastructure.
 - **`sessionStorage` rather than in-memory cache.** It survives a page refresh, which an in-memory cache would not, and is cleared when the tab closes. The cost is that the cache is per tab.
 - **`favoriteMovie` is a free-text column on `User`.** There is no `Movie` table or canonical movie id. This is the simplest model that meets the spec. However, movies are case sensitive, and you need the year for clarification.
 - **Auth.js v5, which is still a beta.** I chose it for its mature Prisma adapter, first-class Next.js App Router support and documentation, and pinned the exact version (`5.0.0-beta.32`) so an install can't pull in a different beta. Auth.js is now maintained by the Better Auth team, which recommends Better Auth for new projects, so a longer-lived app should consider migrating.
@@ -287,7 +294,7 @@ flowchart TB
 - Store the rate limit in a shared store so that it survives between server instances.
 - Make the Content Security Policy stricter with per-request script nonces (the current policy blocks framing, plugins and `<base>` hijacking, but doesn't yet restrict scripts).
 - Display stored facts as a simple “previous facts” list and if the OpenAI call fails, fall back to the latest stored fact.
-- When entering the title, check it against a movie database (TMDB based autocomplete) store the movie's id and year. If the title is ambiguous or unknown it would be resolved before any facts appear. Also, case-sensitivity wouldn't apply.
+- When entering the title, check it against a movie database (TMDB based autocomplete) and store the movie's id and year. If the title is ambiguous or unknown it would be resolved before any facts appear. Also, case-sensitivity wouldn't apply.
 
 ## AI usage
 

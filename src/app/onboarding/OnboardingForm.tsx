@@ -5,7 +5,7 @@ import { TitleLengthHint } from "@/titlelength/TitleLengthHint";
 import { toLengthHint } from "@/lib/title-length";
 import type { OnboardingAction, OnboardingState } from "./types";
 
-const initialState: OnboardingState = { error: null, value: "" };
+const initialState: OnboardingState = { error: null };
 
 /**
  * The onboarding form. The page passes in the server action, which does the
@@ -15,7 +15,7 @@ const initialState: OnboardingState = { error: null, value: "" };
 export function OnboardingForm({ action }: { action: OnboardingAction }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   // Controlled so the character counter can follow it. Being controlled also keeps what was typed when React resets the form after a failed submit.
-  const [value, setValue] = useState(initialState.value);
+  const [value, setValue] = useState("");
   const lengthHint = toLengthHint(value);
 
   return (
