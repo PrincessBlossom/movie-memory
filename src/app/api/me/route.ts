@@ -12,7 +12,7 @@ export async function GET() {
     // Explicit select: only fields in the contract leave the server.
     select: { name: true, email: true, image: true, favoriteMovie: true },
   });
-  // Session outlived its user row: treat as signed out.
+  // Session outlived its user row: assume that the user signed out.
   if (!user) return unauthorized();
 
   return jsonOk<MeResponse>({ user });

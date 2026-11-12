@@ -72,6 +72,7 @@ export async function POST() {
     const fact = await createFactForUser(resolved.userId, resolved.movie);
     return jsonOk<FactResponse>({ fact: toDto(fact) });
   } catch (err) {
+    // Rate limiting error (user asks for too many facts).
     if (err instanceof FactRateLimitError) {
       return jsonError(
         429,

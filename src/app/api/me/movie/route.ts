@@ -37,15 +37,13 @@ export async function PUT(request: Request) {
     return jsonError(400, "VALIDATION_ERROR", message);
   }
 
-  // Scoped by the session's user id. updateMany returns a count instead of
-  // throwing when the row doesn't exist (e.g. the account was deleted).
+  // Scoped by the session's user id. updateMany returns a count instead of throwing when the row doesn't exist (e.g. the account was deleted).
   const { count } = await prisma.user.updateMany({
     where: { id: userId },
     data: { favoriteMovie: parsed.data.movie },
   });
   if (count === 0) return unauthorized();
 
-  // Return the normalized (trimmed) value so the client can reconcile its
-  // optimistic state with exactly what was stored.
+  // Return the normalized (trimmed) value so the client can reconcile its optimistic state with exactly what was stored.
   return jsonOk<UpdateMovieResponse>({ favoriteMovie: parsed.data.movie });
 }
